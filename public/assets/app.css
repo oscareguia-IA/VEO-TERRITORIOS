@@ -816,3 +816,12 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
 .veo-pin-wrap.veo-photo-wrap .veo-opportunity-marker{width:14px;height:14px;transform:translate(-50%,-50%);border-radius:50%;border-width:2px}
 .veo-pin-wrap.veo-photo-wrap .veo-opportunity-marker-core{display:none}
 .veo-pin-wrap.veo-photo-wrap .veo-pin-name{display:none}
+
+/* Google Maps (mapa de oportunidades) */
+.veo-gmap-label{background:#0d2340;padding:3px 8px;border-radius:8px;box-shadow:0 2px 8px #0006;white-space:nowrap}
+.veo-gmap-info{display:flex;flex-direction:column;gap:6px;min-width:190px;font-family:inherit;color:#0d2340}
+.veo-gmap-info strong{font-size:14px}
+.veo-gmap-info small{color:#55657a;font-size:12px}
+.veo-gmap-info a,.veo-gmap-info button{display:block;text-align:center;padding:8px 10px;border-radius:8px;font-weight:700;font-size:12px;text-decoration:none;cursor:pointer;border:0}
+.veo-gmap-info a{background:#1a73e8;color:#fff}
+.veo-gmap-info button{background:#fa3b74;color:#fff}

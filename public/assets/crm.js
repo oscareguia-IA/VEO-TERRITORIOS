@@ -272,7 +272,7 @@ function renderMap(){
 }
 function photoMarkers(pins){const byId=new Map(pins.map(p=>[p.id,p]));return (state.data.photos||[]).filter(f=>byId.has(f.predio_id)&&Number.isFinite(+f.lat)&&Number.isFinite(+f.lng)).map(f=>{const p=byId.get(f.predio_id);return{key:'foto-'+f.id,kind:'foto',id:p.id,lat:+f.lat,lng:+f.lng,color:phaseColor(p.phase),name:'📷 '+(f.filename||'Foto'),code:'Foto de '+p.code+' · '+(f.source==='exif'?'GPS de la foto':'Ubicación del dispositivo'),googleUrl:googlePinUrl(f.lat,f.lng),label:'Foto de '+p.code+' · '+p.alias}})}
 function closeMap(){state.routeToken=(state.routeToken||0)+1;if(state.map){try{state.map.remove()}catch(e){}state.map=null;state.tileLayer=null;state.markers=null}}
-function initMap(){const el=document.getElementById('opportunities-map');if(!el)return;closeMap();const pins=opportunityPins();if(!window.VEOMapNative){el.innerHTML='<div class="opportunity-empty">No se pudo abrir el visor. Actualiza la aplicación.</div>';return}
+async function initMap(){const el=document.getElementById('opportunities-map');if(!el)return;closeMap();const pins=opportunityPins();if(!window.VEOMapNative){el.innerHTML='<div class="opportunity-empty">No se pudo abrir el visor. Actualiza la aplicación.</div>';return}
  // Vista inicial metropolitana fija: nunca centrar sólo un predio registrado.
  // Este rectángulo es una referencia visual amplia del AMM (no límite administrativo).
  const metroBounds={south:25.47,west:-100.64,north:25.96,east:-100.03};
@@ -280,7 +280,10 @@ function initMap(){const el=document.getElementById('opportunities-map');if(!el)
  if(state.selectedCorridor&&CORRIDOR_FOCUS[state.selectedCorridor]){
   const view=CORRIDOR_FOCUS[state.selectedCorridor];center=[view[0],view[1]];z=view[2];
  }
- state.map=new VEOMapNative(el,{center,zoom:z,mode:'streets',markers:pins.map(p=>({id:p.id,lat:+p.lat,lng:+p.lng,color:phaseColor(p.phase),name:p.alias,code:p.code,phase:phaseName(p.phase),googleUrl:googlePinUrl(p.lat,p.lng),label:`${p.code} · ${p.alias} · ${phaseName(p.phase)}`})).concat(photoMarkers(pins)),onMarker:id=>openPredio(id)});
+ const gkey=googleMapsJSKey();let MapClass=window.VEOMapNative;
+ if(gkey&&window.VEOGoogleMap){try{await loadGoogleMapsJS(gkey);MapClass=window.VEOGoogleMap}catch(e){console.warn('Google Maps no disponible; se usa el mapa VEO.',e.message)}}
+ if(!el.isConnected)return;
+ state.map=new MapClass(el,{center,zoom:z,mode:'streets',markers:pins.map(p=>({id:p.id,lat:+p.lat,lng:+p.lng,color:phaseColor(p.phase),name:p.alias,code:p.code,phase:phaseName(p.phase),googleUrl:googlePinUrl(p.lat,p.lng),label:`${p.code} · ${p.alias} · ${phaseName(p.phase)}`})).concat(photoMarkers(pins)),onMarker:id=>openPredio(id)});
  // Una selección debe mostrar la mayor longitud posible, no solo la intersección guía.
  // Si hay trazado OSM en memoria se usa inmediatamente; si aún no, mostrar el
  // área orientativa y reajustar al eje real cuando llegue la geometría.
