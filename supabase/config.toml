@@ -1,0 +1,6 @@
+# Configuración mínima de Supabase CLI / integración con GitHub.
+# Las migraciones en supabase/migrations/ se aplican al proyecto al hacer push a main.
+project_id = "veo-territorios"
+
+[api]
+schemas = ["public"]
