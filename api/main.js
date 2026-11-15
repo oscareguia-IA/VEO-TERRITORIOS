@@ -68,7 +68,10 @@ function tooMany(res,secs){res.setHeader('Retry-After',String(secs));return code
 const IMAGE_EXT=/\.(jpe?g|png|webp|heic|heif)$/i;
 const DISPLAY_EXT=/\.(jpe?g|png|webp)$/i;
 const isDisplayPhoto=d=>d.doc_type==='foto'&&DISPLAY_EXT.test(String(d.original_filename||d.storage_path||''));
-function coverIds(documents){const m={};for(const d of documents)if(isDisplayPhoto(d)&&(!m[d.predio_id]||d.id>m[d.predio_id]))m[d.predio_id]=d.id;return m}
+const VIDEO_EXT=/\.(mp4|mov|m4v|webm)$/i;
+const mediaKind=d=>{const n=String(d.original_filename||d.storage_path||'');if(VIDEO_EXT.test(n))return 'video';if(['foto','satelital','dron'].includes(d.doc_type)&&DISPLAY_EXT.test(n))return 'img';return null};
+const mediaItem=d=>({id:d.id,kind:mediaKind(d),by:d.uploaded_by_name||'',at:d.taken_at||d.created_at,name:d.original_filename||''});
+function mediaByPredio(documents){const m={};for(const d of documents){if(!mediaKind(d))continue;(m[d.predio_id]=m[d.predio_id]||[]).push(d)}for(const k in m)m[k]=m[k].sort((a,b)=>b.id-a.id).slice(0,12).map(mediaItem);return m}
 function docGeo(b){
  const isPhoto=b.doc_type==='foto'&&IMAGE_EXT.test(String(b.original_filename||b.storage_path||''));
  if(b.geo_lat===undefined||b.geo_lat===null||b.geo_lat===''){ensure(!isPhoto,'La fotografía del predio debe estar georreferenciada (GPS de la foto o ubicación del dispositivo).');return{}}
@@ -146,8 +149,8 @@ async function handle(req,res){
   if(me.must_change_password)return result;
   const [users,ps,documents,requests,activity]=await Promise.all([list('veo_users',{order:'id.asc'}),list('veo_predios',{order:'updated_at.desc',limit:3000}),list('veo_documents',{limit:10000}),list('veo_requests',{order:'created_at.desc',limit:1000}),list('veo_activity',{order:'created_at.desc',limit:50})]);
   const visible=ps.filter(p=>p.active&&canSee(me,p));const ids=new Set(visible.map(p=>p.id));const names=Object.fromEntries(users.map(x=>[x.id,x.display_name]));
-  const covers=coverIds(documents);
-  return {...result,maps_js_key:String(process.env.VEO_GOOGLE_MAPS_KEY||'').trim(),users:(mayManage(me)?users:users.filter(x=>x.active&&x.role==='broker')).map(safeUser),predios:visible.map(p=>({...p,broker_name:names[p.broker_id]||'Sin asignar',docs_count:documents.filter(d=>d.predio_id===p.id).length,cover_doc_id:covers[p.id]||null,pending_count:requests.filter(r=>r.predio_id===p.id&&r.status==='pendiente').length})),requests:requests.filter(r=>ids.has(r.predio_id)),photos:documents.filter(d=>ids.has(d.predio_id)&&d.geo_lat!=null&&d.geo_lng!=null).map(d=>({id:d.id,predio_id:d.predio_id,lat:d.geo_lat,lng:d.geo_lng,source:d.geo_source,filename:d.original_filename,img:isDisplayPhoto(d),taken_at:d.taken_at||d.created_at})),activity:activity.filter(a=>a.predio_id==null||ids.has(a.predio_id)),corridors:null,weights:WEIGHTS};
+  const media=mediaByPredio(documents);
+  return {...result,maps_js_key:String(process.env.VEO_GOOGLE_MAPS_KEY||'').trim(),users:(mayManage(me)?users:users.filter(x=>x.active&&x.role==='broker')).map(safeUser),predios:visible.map(p=>({...p,broker_name:names[p.broker_id]||'Sin asignar',docs_count:documents.filter(d=>d.predio_id===p.id).length,media:media[p.id]||[],pending_count:requests.filter(r=>r.predio_id===p.id&&r.status==='pendiente').length})),requests:requests.filter(r=>ids.has(r.predio_id)),photos:documents.filter(d=>ids.has(d.predio_id)&&d.geo_lat!=null&&d.geo_lng!=null).map(d=>({id:d.id,predio_id:d.predio_id,lat:d.geo_lat,lng:d.geo_lng,source:d.geo_source,filename:d.original_filename,media:mediaKind(d)?[mediaItem(d)]:[],taken_at:d.taken_at||d.created_at})),activity:activity.filter(a=>a.predio_id==null||ids.has(a.predio_id)),corridors:null,weights:WEIGHTS};
  }
  ensure(!me.must_change_password,'Debes cambiar la contraseña temporal antes de continuar.',403);
  if(key==='users'&&method==='POST'){
@@ -231,7 +234,7 @@ async function handle(req,res){
  if(parts[0]==='documents'&&parts[1]){
   const d=await one('veo_documents',{id:`eq.${+parts[1]}`});ensure(d,'Documento no encontrado.',404);const p=await predioFor(me,d.predio_id);
   if(parts[2]==='content'&&method==='GET'){
-   const result=await storage('POST',`object/sign/veo-documentos/${encodedPath(d.storage_path)}`,{expiresIn:120});res.statusCode=302;res.setHeader('Location',signedLink(result,d.storage_path,'sign'));res.end();return null;
+   const result=await storage('POST',`object/sign/veo-documentos/${encodedPath(d.storage_path)}`,{expiresIn:900});res.statusCode=302;res.setHeader('Location',signedLink(result,d.storage_path,'sign'));res.end();return null;
   }
   if(parts.length===2&&method==='DELETE'){ensure(canEdit(me,p),'Sin permiso para eliminar documentos.',403);await remove('veo_documents',d.id);try{await storage('DELETE',`object/veo-documentos/${encodedPath(d.storage_path)}`)}catch(_){console.warn('Pendiente de limpieza',d.id)}await audit(me,p.id,'documento','Eliminó documento');return{ok:true}}
  }

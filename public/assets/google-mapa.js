@@ -10,6 +10,8 @@
       <circle cx="17" cy="16.5" r="5" fill="#fff"/></svg>`);
 
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fecha=v=>{const d=new Date(v);return isNaN(d)?'':d.toLocaleDateString('es-MX',{day:'numeric',month:'short',year:'numeric'})};
+  const mediaUrl=m=>'/api/documents/'+encodeURIComponent(m.id)+'/content';
 
   class VEOGoogleMap{
     constructor(el,{center=[25.6866,-100.3161],zoom=12,markers=[],onMarker}={}){
@@ -21,11 +23,22 @@
         zoomControl:true,zoomControlOptions:{position:gm.ControlPosition.RIGHT_BOTTOM},
         styles:[{featureType:'poi.business',stylers:[{visibility:'off'}]},{featureType:'poi',elementType:'labels.icon',stylers:[{visibility:'off'}]}]
       });
-      this.info=new gm.InfoWindow({disableAutoPan:true});
+      this.info=new gm.InfoWindow({maxWidth:270});
+      this.openKey=null;
+      this.info.addListener('closeclick',()=>{this.openKey=null});
+      this.info.addListener('domready',()=>this.wireGallery());
       this.routeLines=[];this.markerObjs=[];
-      // Navegación manual del usuario (para no recentrar de golpe al llegar el trazado del corredor)
       this.map.addListener('dragstart',()=>{this.userNavigated=true});
+      this.map.addListener('click',()=>this.closeInfo());
       el.addEventListener('wheel',()=>{this.userNavigated=true},{passive:true});
+      // Botones dentro del globo (expediente, flechas del carrusel)
+      this._clickHandler=e=>{
+        const nav=e.target.closest?.('[data-veo-nav]');
+        if(nav){e.preventDefault();const track=nav.closest('.veo-gmap-media')?.querySelector('.veo-gmap-track');if(track)track.scrollBy({left:(nav.dataset.veoNav==='next'?1:-1)*track.clientWidth,behavior:'smooth'});return}
+        const b=e.target.closest?.('[data-veo-open]');
+        if(b){e.preventDefault();this.closeInfo();this.onMarker?.(Number(b.dataset.veoOpen))}
+      };
+      el.addEventListener('click',this._clickHandler);
       this.setMarkers(markers);
     }
 
@@ -34,8 +47,7 @@
     fitBounds(b,{padding={x:20,y:30},maxZoom=15}={}){
       if(!b||this.destroyed)return;
       this.map.fitBounds(this.bounds(b),{top:padding.y,bottom:padding.y,left:padding.x,right:padding.x});
-      const once=this.gm.event.addListenerOnce(this.map,'idle',()=>{if(this.map.getZoom()>maxZoom)this.map.setZoom(maxZoom)});
-      this._fitListener=once;
+      this.gm.event.addListenerOnce(this.map,'idle',()=>{if(this.map.getZoom()>maxZoom)this.map.setZoom(maxZoom)});
     }
 
     flyTo(center,zoom){
@@ -52,7 +64,6 @@
       for(const pts of lines){
         if(!pts?.length)continue;
         const path=pts.map(p=>({lat:+p[0],lng:+p[1]}));
-        // contorno blanco + línea de color para que resalte sobre las calles de Google
         this.routeLines.push(new this.gm.Polyline({map:this.map,path,strokeColor:'#ffffff',strokeOpacity:.9,strokeWeight:10,clickable:false,zIndex:10}));
         this.routeLines.push(new this.gm.Polyline({map:this.map,path,strokeColor:color,strokeOpacity:.95,strokeWeight:6,clickable:false,zIndex:11}));
       }
@@ -60,12 +71,12 @@
 
     setMarkers(markers){
       for(const m of this.markerObjs)m.setMap(null);
-      this.markerObjs=[];
+      this.markerObjs=[];this.closeInfo();
       if(this.destroyed)return;
-      const gm=this.gm;
+      const gm=this.gm,hover=!window.matchMedia?.('(hover: none)').matches;
       for(const item of markers||[]){
         if(!Number.isFinite(item.lat)||!Number.isFinite(item.lng))continue;
-        const isPhoto=item.kind==='foto';
+        const isPhoto=item.kind==='foto',key=String(item.key||item.id);
         const marker=new gm.Marker({
           map:this.map,position:{lat:item.lat,lng:item.lng},title:item.label||item.name||'',
           zIndex:isPhoto?5:20,optimized:true,
@@ -74,50 +85,57 @@
             :{url:pinSvg(item.color||'#fa3b74'),scaledSize:new gm.Size(30,39),anchor:new gm.Point(15,38),labelOrigin:new gm.Point(15,-10)},
           label:isPhoto?null:{text:String(item.name||'').slice(0,28),className:'veo-gmap-label',color:'#ffffff',fontSize:'12px',fontWeight:'700'}
         });
-        // Laptop: burbuja compacta al pasar el cursor; clic abre el expediente.
-        // Celular / pantallas táctiles: tarjeta compacta abajo del mapa; el expediente se abre desde la tarjeta.
-        marker.addListener('mouseover',()=>{if(this.isCompact())return;this.info.setContent(this.cardHtml(item,'veo-gmap-info'));this.info.open({map:this.map,anchor:marker})});
-        marker.addListener('click',()=>{
-          if(this.isCompact()){this.info.close();this.showCard(item);return}
-          this.info.setContent(this.cardHtml(item,'veo-gmap-info'));this.info.open({map:this.map,anchor:marker});this.onMarker?.(Number(item.id));
-        });
+        const open=()=>{if(this.openKey===key)return;this.openKey=key;this.info.setContent(this.balloonHtml(item));this.info.open({map:this.map,anchor:marker})};
+        if(hover)marker.addListener('mouseover',open);
+        marker.addListener('click',open); // celular y laptop: el globo se abre; el expediente desde su botón
         this.markerObjs.push(marker);
       }
-      if(!this._openHandler){
-        this._openHandler=e=>{
-          if(e.target.closest?.('[data-veo-close]')){e.preventDefault();this.hideCard();return}
-          const b=e.target.closest?.('[data-veo-open]');if(b){e.preventDefault();this.hideCard();this.onMarker?.(Number(b.dataset.veoOpen))}
-        };
-        this.el.addEventListener('click',this._openHandler);
-        this.map.addListener('click',()=>this.hideCard());
-      }
     }
 
-    isCompact(){return this.el.clientWidth<700||window.matchMedia?.('(hover: none)').matches}
+    closeInfo(){this.info?.close();this.openKey=null}
 
-    cardHtml(item,cls){
-      const photo=item.photoUrl?`<a class="veo-gmap-photo" href="${esc(item.photoUrl)}" target="_blank" rel="noopener" title="Ver foto completa"><img src="${esc(item.photoUrl)}" alt="Foto del predio" loading="lazy" onerror="this.parentNode.remove()"></a>`:'';
-      const close=cls==='veo-gmap-card'?'<button type="button" class="veo-gmap-close" data-veo-close aria-label="Cerrar">×</button>':'';
-      return `<div class="${cls}${item.photoUrl?' has-photo':''}">${close}${photo}<div class="veo-gmap-text"><strong>${esc(item.name||'Predio VEO')}</strong><small>${esc(item.code||'')}</small>`+
+    balloonHtml(item){
+      const media=Array.isArray(item.media)?item.media:[];
+      let gallery='';
+      if(media.length){
+        const slides=media.map(m=>{
+          const url=esc(mediaUrl(m));
+          const body=m.kind==='video'
+            ?`<video src="${url}" controls playsinline preload="metadata"></video>`
+            :`<a href="${url}" target="_blank" rel="noopener" title="Ver foto completa"><img src="${url}" alt="${esc(m.name||'Foto del predio')}" loading="lazy" onerror="this.closest('.veo-gmap-slide').classList.add('is-broken')"></a>`;
+          return `<figure class="veo-gmap-slide">${body}<figcaption>${m.kind==='video'?'🎬 ':'📷 '}${esc(m.by||'Sin autor')} · ${esc(fecha(m.at))}</figcaption></figure>`;
+        }).join('');
+        const nav=media.length>1?`<button type="button" class="veo-gmap-nav prev" data-veo-nav="prev" aria-label="Anterior">‹</button><button type="button" class="veo-gmap-nav next" data-veo-nav="next" aria-label="Siguiente">›</button><span class="veo-gmap-count">1 / ${media.length}</span>`:'';
+        gallery=`<div class="veo-gmap-media"><div class="veo-gmap-track">${slides}</div>${nav}</div>`;
+      }
+      return `<div class="veo-gmap-info">${gallery}`+
+        `<strong class="veo-gmap-title">${esc(item.name||'Predio VEO')}</strong>`+
+        `<small class="veo-gmap-sub">${esc(item.code||'')}</small>`+
+        (item.corridorName?`<small class="veo-gmap-corr">${esc(item.corridorName)}</small>`:'')+
         `<div class="veo-gmap-actions">`+
         (item.googleUrl?`<a class="veo-gmap-maps" href="${esc(item.googleUrl)}" target="_blank" rel="noopener noreferrer">↗ Google Maps</a>`:'')+
-        `<button type="button" class="veo-gmap-open" data-veo-open="${esc(item.id)}">Expediente</button></div></div></div>`;
+        `<button type="button" class="veo-gmap-open" data-veo-open="${esc(item.id)}">Expediente</button></div></div>`;
     }
 
-    showCard(item){
-      if(!this.card){this.card=document.createElement('div');this.card.className='veo-gmap-card-host';this.el.appendChild(this.card)}
-      this.card.innerHTML=this.cardHtml(item,'veo-gmap-card');this.card.hidden=false;
+    // Contador "n / total" al deslizar y pausa de videos que salen de vista
+    wireGallery(){
+      const track=this.el.querySelector('.veo-gmap-info .veo-gmap-track');if(!track||track.dataset.wired)return;
+      track.dataset.wired='1';
+      const count=track.parentNode.querySelector('.veo-gmap-count'),total=track.children.length;
+      let t=null;
+      track.addEventListener('scroll',()=>{clearTimeout(t);t=setTimeout(()=>{
+        const i=Math.round(track.scrollLeft/Math.max(1,track.clientWidth));
+        if(count)count.textContent=(i+1)+' / '+total;
+        [...track.querySelectorAll('video')].forEach((v,idx)=>{if(v.closest('.veo-gmap-slide')!==track.children[i])v.pause()});
+      },80)},{passive:true});
     }
-
-    hideCard(){if(this.card){this.card.hidden=true;this.card.innerHTML=''}}
 
     setMode(){this.map?.setMapTypeId('roadmap')} // siempre calles
 
     remove(){
       this.destroyed=true;
-      try{this.info?.close();for(const m of this.markerObjs)m.setMap(null);for(const l of this.routeLines)l.setMap(null);this.gm.event.clearInstanceListeners(this.map)}catch(_){}
-      if(this._openHandler)this.el.removeEventListener('click',this._openHandler);
-      this.card?.remove();this.card=null;
+      try{this.info?.close();for(const m of this.markerObjs)m.setMap(null);for(const l of this.routeLines)l.setMap(null);this.gm.event.clearInstanceListeners(this.map);this.gm.event.clearInstanceListeners(this.info)}catch(_){}
+      this.el.removeEventListener('click',this._clickHandler);
       this.markerObjs=[];this.routeLines=[];
     }
   }
