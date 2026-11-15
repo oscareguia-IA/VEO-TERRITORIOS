@@ -35,7 +35,7 @@ async function direct(id){const bbox=B[id];const pattern=P[id];if(!bbox||!patter
 }
 // Trazados OSM empaquetados con la app (instantáneos y sin depender de Overpass)
 let staticData=null;
-function loadStatic(){if(!staticData)staticData=fetch('/assets/corredores-trazos.json?v=20261115',{credentials:'same-origin'}).then(r=>r.ok?r.json():null).catch(()=>null);return staticData}
+function loadStatic(){if(!staticData)staticData=fetch('/assets/corredores-trazos.json?v=20261115-14',{credentials:'same-origin'}).then(r=>r.ok?r.json():null).catch(()=>null);return staticData}
 async function load(id,{demo=false}={}){id=+id;if(!B[id])return {status:'invalid',lines:[],message:'Corredor inválido.'};
  const st=await loadStatic();const sl=st?.corridors?.[id];
  if(sl?.length){const r={status:'verified',lines:sl,source:'OpenStreetMap (empaquetado)',message:'Trazado vial de OpenStreetMap.'};mem.set(id,r);return r}
