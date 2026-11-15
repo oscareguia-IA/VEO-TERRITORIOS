@@ -819,13 +819,27 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
 
 /* Google Maps (mapa de oportunidades) */
 .veo-gmap-label{background:#0d2340;padding:3px 8px;border-radius:8px;box-shadow:0 2px 8px #0006;white-space:nowrap}
-.veo-gmap-info{display:flex;flex-direction:column;gap:6px;min-width:190px;font-family:inherit;color:#0d2340}
-.veo-gmap-info strong{font-size:14px}
-.veo-gmap-info small{color:#55657a;font-size:12px}
-.veo-gmap-info a,.veo-gmap-info button{display:block;text-align:center;padding:8px 10px;border-radius:8px;font-weight:700;font-size:12px;text-decoration:none;cursor:pointer;border:0}
-.veo-gmap-info a{background:#1a73e8;color:#fff}
-.veo-gmap-info button{background:#fa3b74;color:#fff}
-
-.veo-gmap-info{width:230px}
-.veo-gmap-info a.veo-gmap-photo{padding:0;background:#e8edf3;border-radius:10px;overflow:hidden;display:block}
-.veo-gmap-photo img{width:100%;height:140px;object-fit:cover;display:block}
+/* Contenido común de burbuja (laptop) y tarjeta (celular) */
+.veo-gmap-info,.veo-gmap-card{font-family:inherit}
+.veo-gmap-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.veo-gmap-text strong{font-size:14px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.veo-gmap-text small{font-size:11.5px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.veo-gmap-actions{display:flex;gap:6px;margin-top:8px}
+.veo-gmap-actions a,.veo-gmap-actions button{flex:1;display:flex;align-items:center;justify-content:center;height:32px;padding:0 8px;border:0;border-radius:8px;font:700 12px/1 inherit;text-decoration:none;cursor:pointer;white-space:nowrap}
+.veo-gmap-maps{background:#1a73e8;color:#fff}
+.veo-gmap-open{background:#fa3b74;color:#fff}
+a.veo-gmap-photo{display:block;overflow:hidden;border-radius:8px;background:#e8edf3}
+.veo-gmap-photo img{width:100%;height:100%;object-fit:cover;display:block}
+/* Laptop: burbuja de Google compacta */
+.veo-gmap-info{width:220px;color:#0d2340}
+.veo-gmap-info a.veo-gmap-photo{height:104px;margin-bottom:8px}
+/* Celular: tarjeta fija abajo del mapa */
+.veo-gmap-card-host{position:absolute;left:10px;right:10px;bottom:12px;z-index:6;pointer-events:none}
+.veo-gmap-card-host[hidden]{display:none}
+.veo-gmap-card{pointer-events:auto;position:relative;display:grid;grid-template-columns:1fr;gap:10px;align-items:center;max-width:460px;margin:0 auto;padding:10px 12px;background:#0f2238;color:#fff;border:1px solid #ffffff1f;border-radius:14px;box-shadow:0 8px 24px #0009;animation:veoCardIn .18s ease-out}
+.veo-gmap-card.has-photo{grid-template-columns:68px 1fr}
+.veo-gmap-card a.veo-gmap-photo{width:68px;height:68px}
+.veo-gmap-card .veo-gmap-text{padding-right:22px}
+.veo-gmap-card .veo-gmap-actions{margin-top:6px}
+.veo-gmap-close{position:absolute;top:4px;right:6px;width:28px;height:28px;border:0;background:transparent;color:#fff;font-size:20px;line-height:1;cursor:pointer;opacity:.8}
+@keyframes veoCardIn{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}

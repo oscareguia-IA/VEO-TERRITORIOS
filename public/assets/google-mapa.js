@@ -74,18 +74,42 @@
             :{url:pinSvg(item.color||'#fa3b74'),scaledSize:new gm.Size(30,39),anchor:new gm.Point(15,38),labelOrigin:new gm.Point(15,-10)},
           label:isPhoto?null:{text:String(item.name||'').slice(0,28),className:'veo-gmap-label',color:'#ffffff',fontSize:'12px',fontWeight:'700'}
         });
-        const html=`<div class="veo-gmap-info">`+(item.photoUrl?`<a class="veo-gmap-photo" href="${esc(item.photoUrl)}" target="_blank" rel="noopener" title="Ver foto completa"><img src="${esc(item.photoUrl)}" alt="Foto del predio" loading="lazy" onerror="this.parentNode.remove()"></a>`:'')+`<strong>${esc(item.name||'Predio VEO')}</strong><small>${esc(item.code||'')}</small>`+
-          (item.googleUrl?`<a href="${esc(item.googleUrl)}" target="_blank" rel="noopener noreferrer">↗ Ver en Google Maps</a>`:'')+
-          `<button type="button" data-veo-open="${esc(item.id)}">Abrir expediente</button></div>`;
-        marker.addListener('mouseover',()=>{this.info.setContent(html);this.info.open({map:this.map,anchor:marker})});
-        marker.addListener('click',()=>{this.info.setContent(html);this.info.open({map:this.map,anchor:marker});this.onMarker?.(Number(item.id))});
+        // Laptop: burbuja compacta al pasar el cursor; clic abre el expediente.
+        // Celular / pantallas táctiles: tarjeta compacta abajo del mapa; el expediente se abre desde la tarjeta.
+        marker.addListener('mouseover',()=>{if(this.isCompact())return;this.info.setContent(this.cardHtml(item,'veo-gmap-info'));this.info.open({map:this.map,anchor:marker})});
+        marker.addListener('click',()=>{
+          if(this.isCompact()){this.info.close();this.showCard(item);return}
+          this.info.setContent(this.cardHtml(item,'veo-gmap-info'));this.info.open({map:this.map,anchor:marker});this.onMarker?.(Number(item.id));
+        });
         this.markerObjs.push(marker);
       }
       if(!this._openHandler){
-        this._openHandler=e=>{const b=e.target.closest?.('[data-veo-open]');if(b){e.preventDefault();this.onMarker?.(Number(b.dataset.veoOpen))}};
+        this._openHandler=e=>{
+          if(e.target.closest?.('[data-veo-close]')){e.preventDefault();this.hideCard();return}
+          const b=e.target.closest?.('[data-veo-open]');if(b){e.preventDefault();this.hideCard();this.onMarker?.(Number(b.dataset.veoOpen))}
+        };
         this.el.addEventListener('click',this._openHandler);
+        this.map.addListener('click',()=>this.hideCard());
       }
     }
+
+    isCompact(){return this.el.clientWidth<700||window.matchMedia?.('(hover: none)').matches}
+
+    cardHtml(item,cls){
+      const photo=item.photoUrl?`<a class="veo-gmap-photo" href="${esc(item.photoUrl)}" target="_blank" rel="noopener" title="Ver foto completa"><img src="${esc(item.photoUrl)}" alt="Foto del predio" loading="lazy" onerror="this.parentNode.remove()"></a>`:'';
+      const close=cls==='veo-gmap-card'?'<button type="button" class="veo-gmap-close" data-veo-close aria-label="Cerrar">×</button>':'';
+      return `<div class="${cls}${item.photoUrl?' has-photo':''}">${close}${photo}<div class="veo-gmap-text"><strong>${esc(item.name||'Predio VEO')}</strong><small>${esc(item.code||'')}</small>`+
+        `<div class="veo-gmap-actions">`+
+        (item.googleUrl?`<a class="veo-gmap-maps" href="${esc(item.googleUrl)}" target="_blank" rel="noopener noreferrer">↗ Google Maps</a>`:'')+
+        `<button type="button" class="veo-gmap-open" data-veo-open="${esc(item.id)}">Expediente</button></div></div></div>`;
+    }
+
+    showCard(item){
+      if(!this.card){this.card=document.createElement('div');this.card.className='veo-gmap-card-host';this.el.appendChild(this.card)}
+      this.card.innerHTML=this.cardHtml(item,'veo-gmap-card');this.card.hidden=false;
+    }
+
+    hideCard(){if(this.card){this.card.hidden=true;this.card.innerHTML=''}}
 
     setMode(){this.map?.setMapTypeId('roadmap')} // siempre calles
 
@@ -93,6 +117,7 @@
       this.destroyed=true;
       try{this.info?.close();for(const m of this.markerObjs)m.setMap(null);for(const l of this.routeLines)l.setMap(null);this.gm.event.clearInstanceListeners(this.map)}catch(_){}
       if(this._openHandler)this.el.removeEventListener('click',this._openHandler);
+      this.card?.remove();this.card=null;
       this.markerObjs=[];this.routeLines=[];
     }
   }
