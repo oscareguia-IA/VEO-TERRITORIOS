@@ -1,5 +1,5 @@
 
-/* VEO TERRITORIOS | Frontend único. Backend real por FastAPI; demo local opcional. */
+/* VEO TERRITORIOS | Interfaz existente conectada a API segura en Vercel. */
 'use strict';
 const PHASES=['BUSQUEDA_FACTIBILIDAD','PRIMER_CONTACTO','SEGUIMIENTO','CIERRE'];
 const PHASELABEL=['BÚSQUEDA / FACTIBILIDAD','PRIMER CONTACTO / CALIFICADOS','SEGUIMIENTO','CIERRE'];
@@ -7,7 +7,7 @@ const COLORS=['#21cee5','#a88dff','#ffb765','#ff4b84'];
 const DOC_TYPES={foto:'Fotografía del predio',satelital:'Mapa satelital / evidencia',dron:'Video con dron',carta_intencion:'Carta de intención',contrato:'Contrato condicionado',mecanica_suelos:'Mecánica de suelos',memoria_calculo:'Memoria de cálculo',factibilidad_electrica:'Factibilidad eléctrica',permiso_municipal:'Permiso municipal',otro:'Otros documentos'};
 const WEIGHTS={flujo:30,visibilidad:25,urbana:15,electrica:10,propietario:10,comercial:10};
 const RATINGLABEL={flujo:'Intensidad y sentido de tráfico',visibilidad:'Visibilidad y tiempo de exposición',urbana:'Compatibilidad urbana / emplazamiento',electrica:'Acceso y factibilidad eléctrica',propietario:'Disponibilidad y acceso al propietario',comercial:'Condiciones económicas estimadas'};
-const demo=true; // Publicación estática Vercel: datos SOLO en este navegador.
+const demo=false; // Modo multiusuario: todas las operaciones se validan en la API de Vercel.
 const root=document.getElementById('view'), loginRoot=document.getElementById('login-root'), shell=document.getElementById('shell');
 let state={view:'dashboard',data:null,user:null,csrf:'',selectedCorridor:0,phaseFilter:'',brokerFilter:'',search:'',map:null,markers:null,tileLayer:null,base:'streets',mapProvider:'veo',drawer:null,drawerTab:'general',pin:null,picker:null,loading:false};
 const E=s=>String(s===null||s===undefined?'':s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -68,7 +68,7 @@ async function highlightPickerCorridor(id){
  const pk=state.picker;if(!pk)return;const token=pk.routeToken=(pk.routeToken||0)+1;
  pk.map?.setRoute([],{});setGoogleCorridorRoute(pk,null);
  const status=document.getElementById('picker-route-status');showRouteStatus(status,{status:'loading'});
- const result=await window.VEORoutes.load(id,{demo});
+ const result=await window.VEORoutes.load(id,{demo:true});
  if(state.picker!==pk||pk.corridorId!==+id||pk.routeToken!==token)return;
  pk.routeData=result;pk.map?.setRoute(result.lines,{color:ROUTE_HIGHLIGHT_COLOR});
  setGoogleCorridorRoute(pk,result);showRouteStatus(status,result);
@@ -81,7 +81,7 @@ async function highlightOpportunityCorridor(map,id){
  const status=document.getElementById('opportunity-route-status');
  if(!id){if(status)status.textContent='Selecciona un corredor para resaltar la avenida en rosa.';return}
  showRouteStatus(status,{status:'loading'});
- const result=await window.VEORoutes.load(id,{demo});if(state.map!==map||token!==state.routeToken)return;
+ const result=await window.VEORoutes.load(id,{demo:true});if(state.map!==map||token!==state.routeToken)return;
  map.setRoute(result.lines,{color:ROUTE_HIGHLIGHT_COLOR});showRouteStatus(status,result);
  // Con geometría OSM, ajustar TODO el corredor al área visible (con márgenes);
  // si el usuario ya movió el mapa, respetar su navegación y no recentrar de golpe.
@@ -99,143 +99,17 @@ const isAdmin=()=>state.user?.role==='admin';
 const toast=(msg,error=false)=>{const x=document.getElementById('toast');x.textContent=msg;x.className='toast'+(error?' error':'');clearTimeout(toast.t);toast.t=setTimeout(()=>x.classList.add('hidden'),5500)};
 function icon(name){const paths={grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',map:'<polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21 3 6"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>',pipeline:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 7v10m5-10v10m5-10v10"/>',pin:'<path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/>',users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',approval:'<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 7h8m-8 4h8m-8 4 2 2 5-5"/>',file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8m-8 4h8"/>',settings:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06-1.9 1.9-.06-.06A1.65 1.65 0 0 0 16 18.4a1.65 1.65 0 0 0-1 .9v.7h-3v-.7a1.65 1.65 0 0 0-1-.9 1.65 1.65 0 0 0-1.82.33l-.06.06-1.9-1.9.06-.06A1.65 1.65 0 0 0 7.6 15a1.65 1.65 0 0 0-.9-1H6v-3h.7a1.65 1.65 0 0 0 .9-1A1.65 1.65 0 0 0 7.27 8.2l-.06-.06 1.9-1.9.06.06A1.65 1.65 0 0 0 11 6.6a1.65 1.65 0 0 0 1-.9V5h3v.7a1.65 1.65 0 0 0 1 .9 1.65 1.65 0 0 0 1.82-.33l.06-.06 1.9 1.9-.06.06A1.65 1.65 0 0 0 19.4 10a1.65 1.65 0 0 0 .9 1h.7v3h-.7a1.65 1.65 0 0 0-.9 1Z"/>',cross:'<path d="M18 6 6 18M6 6l12 12"/>',target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',chart:'<path d="M3 3v18h18"/><path d="m7 16 4-6 4 3 5-8"/>',chevron:'<path d="m9 18 6-6-6-6"/>'};return `<svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">${paths[name]||paths.grid}</svg>`}
 const demoKey='veo_territorios_demo_v1';
-let demoDB;
-// Demostración local: hashes sólo para simular el flujo. El acceso seguro es el del servidor.
-let demoSession=null;
-async function demoPasswordHash(password,username){
- const material=new TextEncoder().encode('VEO-DEMO-2026/'+username+':'+password);
- if(window.crypto?.subtle){
-  const digest=await crypto.subtle.digest('SHA-256',material);
-  return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('');
- }
- // Retrocompatibilidad en navegadores que niegan WebCrypto a HTML local: NO ofrece seguridad real.
- let h=2166136261;for(const v of material){h=Math.imul(h^v,16777619)}return 'local-'+(h>>>0).toString(16);
-}
-async function initDemo(){
- try{demoDB=JSON.parse(localStorage.getItem(demoKey))}catch(e){}
- if(!demoDB){demoDB={users:[{id:1,username:'ADMIN',display_name:'Administrador VEO',role:'admin',active:1},{id:2,username:'broker_demo',display_name:'Broker VEO',role:'broker',active:1}],predios:[],documents:[],comments:[],activity:[],requests:[],seq:100}}
- // Migración transparente: conserva datos, ID y contraseña personal del administrador ya existente.
- for(const u of demoDB.users){
-  if(u.role==='admin'&&(u.username==='demo_admin'||u.username==='admin')&&!demoDB.users.some(v=>v!==u&&v.username==='ADMIN')){
-   u.password_salt_username=u.password_salt_username||u.username;
-   u.username='ADMIN';
-  }
- }
- for(const u of demoDB.users){
-  if(!u.password_digest){
-   const initial=u.role==='admin'?'VEOdemo2026!':u.username==='broker_demo'?'Broker2026!':'Temporal2026!';
-   u.password_digest=await demoPasswordHash(initial,u.password_salt_username||u.username);
-   u.must_change_password=1;
-   u.password_changed_at=null;u.credential_updated_at=new Date().toISOString();
-  }
-  delete u.password;
- }
- saveDemo();
- try{demoSession=Number(sessionStorage.getItem('veo_demo_user_id'))||null}catch(e){demoSession=null}
- if(!demoDB.users.some(u=>u.id===demoSession&&u.active))demoSession=null;
- window.VEO_DEMO_CORRIDORS=window.VEO_DEMO_CORRIDORS||[];
-}
-function saveDemo(){try{localStorage.setItem(demoKey,JSON.stringify(demoDB))}catch(e){console.warn('Almacenamiento local no disponible o insuficiente: utilice la versión con servidor para datos persistentes.')}}
-// Recuperación SOLO para la edición estática de demostración.
-// No restaura ni borra predios; las cuentas reales deben restablecerse desde el servidor.
-async function resetDemoAdminAccess(){
- if(!demo||!demoDB?.users)throw Error('Esta recuperación sólo existe en la versión de prueba.');
- const u=demoDB.users.find(x=>x.role==='admin'&&(String(x.username).toUpperCase()==='ADMIN'||x.id===1));
- if(!u)throw Error('No se encontró la cuenta de administrador de demostración.');
- u.username='ADMIN';u.password_salt_username='ADMIN';u.password_digest=await demoPasswordHash('VEOdemo2026!','ADMIN');
- u.active=1;u.must_change_password=1;u.password_changed_at=null;u.credential_updated_at=new Date().toISOString();
- saveDemo();demoSession=null;try{sessionStorage.removeItem('veo_demo_user_id')}catch(e){}
- loginScreen();toast('Acceso de prueba restablecido. Usa las credenciales iniciales indicadas en las instrucciones.');
+function hasLocalDemoData(){try{return !!localStorage.getItem(demoKey)}catch(_){return false}}
+async function exportLocalBackup(){
+ const contents=localStorage.getItem(demoKey);if(!contents)throw Error('Este navegador no contiene datos de la versión anterior.');
+ const blob=new Blob([contents],{type:'application/json;charset=utf-8'});
+ const filename='VEO_respaldo_local_'+new Date().toISOString().slice(0,10)+'.json';
+ const file=new File([blob],filename,{type:'application/json'});
+ if(navigator.canShare?.({files:[file]})&&navigator.share){try{await navigator.share({files:[file],title:'Respaldo local VEO'});return}catch(e){if(e.name==='AbortError')return}}
+ const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),12000);
 }
 
-function demoAudit(pid,kind,detail){demoDB.activity.unshift({id:++demoDB.seq,predio_id:pid,user_id:1,kind,detail,created_at:new Date().toISOString(),user_name:'Administrador demo'})}
-function reqs(p,docs,to){const found=t=>docs.some(x=>x.doc_type===t);let items=[],add=(label,done)=>items.push({key:label,label,done:!!done});
- if(to==='PRIMER_CONTACTO'){add('Broker asignado',p.broker_id);add('Ubicación y corredor verificados (pin GPS)',p.lat!=null&&p.lng!=null&&p.geo_status==='verificado');add('Fotografía del predio',found('foto'));add('Evidencia de mapa satelital',found('satelital'));add('Video con dron (archivo o enlace en expediente)',found('dron')||(/^https?:\/\//.test(p.dron_url||'')));add('Calificación ≥70/100',p.score>=70)}
- if(to==='SEGUIMIENTO'){add('Nombre del dueño / administrador',p.propietario);add('Teléfono o correo de contacto',p.telefono||p.email);add('Fecha del primer contacto',p.fecha_contacto);add('Respuesta no descartada',['evaluando','interesado'].includes(p.interes))}
- if(to==='CIERRE'){add('Carta de intención presentada',found('carta_intencion'));add('Interés confirmado del propietario',p.interes==='interesado');add('Condición de permiso municipal explicada',p.clausula_condicional)}return items}
-function ready(p,docs){let x=[['contrato','Contrato firmado / condicionado'],['mecanica_suelos','Estudio de mecánica de suelos'],['memoria_calculo','Memoria de cálculo estructural'],['factibilidad_electrica','Factibilidad eléctrica'],['permiso_municipal','Documento de permiso municipal']].map(([k,label])=>({key:k,label,done:docs.some(d=>d.doc_type===k)}));x.push({key:'permiso',label:'Permiso municipal autorizado',done:p.permiso_status==='autorizado'},{key:'clausula',label:'Cláusula suspensiva reconocida',done:!!p.clausula_condicional});return{complete:p.phase==='CIERRE'&&x.every(q=>q.done),items:x}}
-async function mockApi(path,options={}){
- const method=options.method||'GET',payload=options.body instanceof FormData?options.body:(options.body?JSON.parse(options.body):{});
- const ok=()=>{saveDemo();return{ok:true}},end=path.split('/').filter(Boolean);
- if(path==='/api/login'&&method==='POST'){
-  const u=demoDB.users.find(x=>x.username.toLowerCase()===String(payload.username||'').trim().toLowerCase());
-  if(!u||!u.active||u.password_digest!==await demoPasswordHash(String(payload.password||''),u.password_salt_username||u.username))throw Error('Credenciales inválidas');
-  demoSession=u.id;try{sessionStorage.setItem('veo_demo_user_id',String(u.id))}catch(e){}return{ok:true};
- }
- if(path==='/api/logout'){
-  demoSession=null;try{sessionStorage.removeItem('veo_demo_user_id')}catch(e){}return{ok:true};
- }
- const me=demoDB.users.find(u=>u.id===demoSession&&u.active);
- if(!me)throw Error('Inicie sesión con usuario y contraseña');
- if(path==='/api/me/password'&&method==='POST'){
-  if(me.password_digest!==await demoPasswordHash(String(payload.current_password||''),me.password_salt_username||me.username))throw Error('La contraseña actual no coincide');
-  if(String(payload.new_password||'').length<10)throw Error('La contraseña debe tener al menos 10 caracteres');
-  if(payload.new_password===payload.current_password)throw Error('La nueva contraseña debe ser distinta');
-  me.password_digest=await demoPasswordHash(payload.new_password,me.password_salt_username||me.username);
-  me.must_change_password=0;me.password_changed_at=new Date().toISOString();me.credential_updated_at=me.password_changed_at;
-  demoAudit(null,'credenciales',`Cambió contraseña de ${me.username}`);saveDemo();return{ok:true};
- }
- if(path==='/api/bootstrap'){
-  const publicUser=({password_digest,password,...data})=>data;
-  const user={...publicUser(me),csrf:'demo'};
-  if(me.must_change_password)return{user,csrf:'demo',must_change_password:true};
-  const userList=me.role==='admin'||me.role==='supervisor'?demoDB.users:demoDB.users.filter(u=>u.active&&u.role==='broker');
-  return{user,users:userList.map(publicUser),predios:demoDB.predios.filter(p=>p.active&&(me.role!=='broker'||p.broker_id===me.id||p.created_by===me.id)).map(p=>({...p,broker_name:demoDB.users.find(u=>u.id===p.broker_id)?.display_name||'Sin asignar',docs_count:demoDB.documents.filter(d=>d.predio_id===p.id).length,pending_count:demoDB.requests.filter(r=>r.predio_id===p.id&&r.status==='pendiente').length})),requests:demoDB.requests,activity:demoDB.activity.slice(0,50),corridors:window.VEO_DEMO_CORRIDORS,weights:WEIGHTS,csrf:'demo',must_change_password:false};
- }
- if(me.must_change_password)throw Error('Debe cambiar su contraseña inicial');
- if(path==='/api/archives')return{predios:demoDB.predios.filter(x=>!x.active).map(p=>({...p,broker_name:demoDB.users.find(u=>u.id===p.broker_id)?.display_name||'—'}))};
- if(path==='/api/users'&&method==='POST'){
-  if(me.role!=='admin')throw Error('Sólo el administrador gestiona credenciales');
-  if(demoDB.users.find(u=>u.username===payload.username))throw Error('Usuario duplicado');
-  if(String(payload.password||'').length<10)throw Error('La contraseña inicial requiere 10 caracteres');
-  const {password,...publicData}=payload;
-  const u={...publicData,id:++demoDB.seq,role:payload.role||'broker',active:1,must_change_password:1,password_changed_at:null,credential_updated_at:new Date().toISOString(),created_at:new Date().toISOString(),password_digest:await demoPasswordHash(password,payload.username)};
-  demoDB.users.push(u);demoAudit(null,'credenciales','Creó cuenta '+u.username);saveDemo();return{ok:true};
- }
- if(end[1]==='users'&&end[2]&&method==='PATCH'){
-  if(me.role!=='admin')throw Error('Sólo el administrador gestiona credenciales');
-  const u=demoDB.users.find(x=>x.id===+end[2]);if(!u)throw Error('Usuario no encontrado');
-  if(u.id===me.id&&(payload.active===false||payload.role&&payload.role!=='admin'||payload.password))throw Error('Use Mi contraseña para cambiar la clave propia');
-  const {password,...publicData}=payload;
-  Object.assign(u,publicData);
-  if(password){if(password.length<10)throw Error('Contraseña mínima: 10 caracteres');u.password_digest=await demoPasswordHash(password,u.password_salt_username||u.username);u.must_change_password=1;u.credential_updated_at=new Date().toISOString()}
-  demoAudit(null,'credenciales','Actualizó usuario '+u.username);return ok();
- }
- if(end[1]==='users'&&end[2]&&method==='DELETE'){
-  if(me.role!=='admin')throw Error('Sólo el administrador puede dar de baja a brokers');
-  const u=demoDB.users.find(x=>x.id===+end[2]);if(!u||u.role!=='broker')throw Error('La baja sólo se aplica a brokers');
-  u.active=0;demoAudit(null,'credenciales','Baja de broker '+u.username);
-  return {...ok(),predios_preservados:demoDB.predios.filter(p=>p.broker_id===u.id||p.created_by===u.id).length};
- }
- if(path==='/api/predios'&&method==='POST'){if(!payload.lat||!payload.lng)throw Error('Debe seleccionar y validar el pin GPS');await assertCorridorPoint(payload.corridor_id,{lat:payload.lat,lng:payload.lng});let id=++demoDB.seq;let p={id,code:`VEO-${String(payload.corridor_id).padStart(2,'0')}-${String(id).padStart(5,'0')}`,geo_status:veoGeoProof?.status==='validated'?'verificado':'pendiente',geo_checked_at:new Date().toISOString(),corridor_id:+payload.corridor_id,alias:payload.alias,broker_id:me.role==='broker'?me.id:(payload.broker_id||null),municipio:'',direccion:'',referencia:'',dron_url:'',lat:payload.lat??null,lng:payload.lng??null,propietario:'',telefono:'',email:'',fecha_contacto:'',interes:'sin_contacto',fecha_carta:'',clausula_condicional:0,permiso_status:'no_iniciado',notas:'',ratings_json:'{}',score:0,phase:PHASES[0],active:1,created_by:me.id,created_at:new Date().toISOString(),updated_at:new Date().toISOString()};demoDB.predios.push(p);demoAudit(id,'alta',`Nuevo predio ${p.code}`);saveDemo();return{id,code:p.code}}
- if(end[1]==='predios'&&end[2]){
-  const pid=+end[2],p=demoDB.predios.find(x=>x.id===pid);if(!p)throw Error('Predio no encontrado');const docs=demoDB.documents.filter(d=>d.predio_id===pid);
-  if(end.length===3&&method==='DELETE'){
-   if(state.user?.role!=='admin')throw Error('Sólo el administrador puede eliminar predios definitivamente.');
-   if(payload.confirmation_code!==p.code)throw Error('El ID de confirmación no coincide con el predio.');
-   const counts={documents:docs.length,comments:demoDB.comments.filter(x=>x.predio_id===pid).length,phase_requests:demoDB.requests.filter(x=>x.predio_id===pid).length,activity:demoDB.activity.filter(x=>x.predio_id===pid).length,predios:1};
-   demoDB.predios=demoDB.predios.filter(x=>x.id!==pid);
-   demoDB.documents=demoDB.documents.filter(x=>x.predio_id!==pid);
-   demoDB.comments=demoDB.comments.filter(x=>x.predio_id!==pid);
-   demoDB.requests=demoDB.requests.filter(x=>x.predio_id!==pid);
-   demoDB.activity=demoDB.activity.filter(x=>x.predio_id!==pid);
-   demoAudit(null,'eliminacion_permanente',`Eliminó definitivamente el expediente ${p.code}`);
-   saveDemo();return{ok:true,deleted_code:p.code,deleted:counts,files_cleanup_pending:0};
-  }
-  if(end.length===3&&method==='GET')return{predio:p,documents:docs,comments:demoDB.comments.filter(x=>x.predio_id===pid).slice().reverse(),history:demoDB.activity.filter(x=>x.predio_id===pid).slice().reverse().map(x=>({...x,author:'Administrador demo'})),requests:demoDB.requests.filter(x=>x.predio_id===pid),next_requirements:p.phase==='CIERRE'?[]:reqs(p,docs,PHASES[stageIndex(p.phase)+1]),readiness:ready(p,docs),can_edit:true};
-  if(end.length===3&&method==='PATCH'){if(['corridor_id','lat','lng'].some(k=>k in payload)){let nextId=+('corridor_id' in payload?payload.corridor_id:p.corridor_id), nextLat='lat' in payload?payload.lat:p.lat,nextLng='lng' in payload?payload.lng:p.lng;if(nextId!==+p.corridor_id||nextLat!==p.lat||nextLng!==p.lng){let validation=await assertCorridorPoint(nextId,{lat:+nextLat,lng:+nextLng});p.geo_status=validation.status==='validated'?'verificado':'pendiente';p.geo_checked_at=new Date().toISOString();}}Object.assign(p,payload);if(payload.ratings_json){const ratings=JSON.parse(payload.ratings_json);p.score=Math.round(Object.entries(WEIGHTS).reduce((s,[k,w])=>s+(+ratings[k]||0)*w/5,0))}p.updated_at=new Date().toISOString();demoAudit(pid,'edicion','Actualizó expediente');return ok()}
-  if(end[3]==='comments'&&method==='POST'){demoDB.comments.push({id:++demoDB.seq,predio_id:pid,body:payload.body,author:'Administrador demo',created_at:new Date().toISOString()});demoAudit(pid,'comentario','Agregó comentario');return ok()}
-  if(end[3]==='documents'&&method==='POST'){const file=payload.get('file');const doc_type=payload.get('doc_type');if(file.size>1300000)throw Error('Vista previa: el máximo por archivo es 1.3 MB. Use la versión con servidor para videos y documentos grandes.');const b64=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=rej;fr.readAsDataURL(file)});demoDB.documents.push({id:++demoDB.seq,predio_id:pid,doc_type,original_filename:file.name,uploaded_by_name:'Administrador demo',created_at:new Date().toISOString(),size_bytes:file.size,data:b64});demoAudit(pid,'documento',`Adjuntó ${DOC_TYPES[doc_type]}`);return ok()}
-  if(end[3]==='geo'&&end[4]==='revalidate'&&method==='POST'){const result=await validateCorridorPoint(p.corridor_id,{lat:+p.lat,lng:+p.lng});if(result.status!=='unavailable')p.geo_status=result.ok?'verificado':'fuera_corredor';demoAudit(pid,'geo','Revalidación: '+p.geo_status);saveDemo();return {result,geo_status:p.geo_status};}
-  if(end[3]==='request'&&method==='POST'){if(stageIndex(p.phase)===3)throw Error('Ya está en Cierre');const to=PHASES[stageIndex(p.phase)+1];const missing=reqs(p,docs,to).filter(x=>!x.done).map(x=>x.label);if(missing.length)throw Error('Faltan requisitos: '+missing.join('; '));if(demoDB.requests.some(r=>r.predio_id===pid&&r.status==='pendiente'))throw Error('Solicitud pendiente');demoDB.requests.unshift({id:++demoDB.seq,predio_id:pid,from_phase:p.phase,to_phase:to,status:'pendiente',code:p.code,alias:p.alias,created_at:new Date().toISOString(),requester_name:'Administrador demo',reason:payload.reason||''});demoAudit(pid,'solicitud',`Solicitó ${to}`);return ok()}
-  if(end[3]==='archive'&&method==='POST'){p.active=payload.restore?1:0;demoAudit(pid,'archivo',p.active?'Restauró predio':'Archivó predio');return ok()}
- }
- if(end[1]==='requests'&&end[3]==='resolve'){const r=demoDB.requests.find(x=>x.id===+end[2]);if(!r)throw Error('Solicitud inexistente');const p=demoDB.predios.find(x=>x.id===r.predio_id);if(payload.decision==='aprobada'){let missing=reqs(p,demoDB.documents.filter(x=>x.predio_id===p.id),r.to_phase).filter(x=>!x.done);if(missing.length)throw Error('Faltan requisitos: '+missing.map(x=>x.label).join('; '));p.phase=r.to_phase}r.status=payload.decision;r.review_note=payload.review_note||'';demoAudit(p.id,'fase',`Solicitud ${r.status}: ${r.to_phase}`);return ok()}
- if(end[1]==='documents'&&end[2]&&method==='DELETE'){const d=demoDB.documents.find(x=>x.id===+end[2]);demoDB.documents=demoDB.documents.filter(x=>x.id!==d?.id);demoAudit(d?.predio_id,'documento','Eliminó documento');return ok()}
- throw Error('Esta función requiere el servidor local.');
-}
 async function api(path,options={}){
- if(demo)return mockApi(path,options);
  let headers={...options.headers};if(options.method&&options.method!=='GET'&&!(options.body instanceof FormData))headers['Content-Type']='application/json';if(options.method&&options.method!=='GET'&&path!=='/api/login')headers['X-CSRF-Token']=state.csrf;
  let r=await fetch(path,{...options,headers,credentials:'same-origin'});
  if(r.status===401&&path!=='/api/login'){loginScreen();throw Error('Sesión vencida: vuelva a iniciar sesión')}
@@ -243,15 +117,15 @@ async function api(path,options={}){
  return r.json();
 }
 async function loadAll(){
- const data=await api('/api/bootstrap');state.data=data;state.user=data.user;state.csrf=data.csrf;
+ const data=await api('/api/bootstrap');if(!data.corridors)data.corridors=window.VEO_DEMO_CORRIDORS||[];state.data=data;state.user=data.user;state.csrf=data.csrf;
  if(data.must_change_password||data.user?.must_change_password){passwordChangeScreen(true);return}
  shell.classList.remove('hidden');loginRoot.innerHTML='';render();
 }
 async function refresh(reopen=false){const current=state.drawer?.predio?.id;const tab=state.drawerTab;await loadAll();if(reopen&&current){await openPredio(current,tab)}}
-function loginScreen(){state.user=null;shell.classList.add('hidden');document.getElementById('drawer').innerHTML='';loginRoot.innerHTML=`<div class="auth-wrap"><div class="auth-card login-card"><img class="login-logo" src="${demo?DEMO_LOGO:'/assets/veo_logo.png'}" alt="Logotipo VEO" /><div class="page-kicker">VEO TERRITORIOS</div><h1>Iniciar sesión</h1><p class="login-subtitle">Accede a tu espacio VEO TERRITORIOS</p><form data-form="login"><div class="field-group"><label class="field-label" for="veo-login-username">Usuario</label><input id="veo-login-username" name="username" class="field" autocomplete="username" required placeholder="Nombre de usuario" /></div><div class="field-group"><label class="field-label" for="veo-login-password">Contraseña</label><input id="veo-login-password" name="password" type="password" class="field" autocomplete="current-password" required placeholder="Contraseña" /></div><label class="auth-show-password"><input type="checkbox" data-toggle-password aria-label="Mostrar contraseña" /><span>Mostrar contraseña</span></label><button class="btn btn-primary" type="submit">ENTRAR AL CRM</button></form><p class="login-footnote">Acceso autorizado VEO</p><button type="button" class="demo-recover-link" data-action="reset-demo-login">¿Restablecer acceso?</button></div></div>`}
+function loginScreen(){state.user=null;shell.classList.add('hidden');document.getElementById('drawer').innerHTML='';loginRoot.innerHTML=`<div class="auth-wrap"><div class="auth-card login-card"><img class="login-logo" src="${DEMO_LOGO}" alt="Logotipo VEO" /><div class="page-kicker">VEO TERRITORIOS</div><h1>Iniciar sesión</h1><p class="login-subtitle">Accede a tu espacio VEO TERRITORIOS</p><form data-form="login"><div class="field-group"><label class="field-label" for="veo-login-username">Usuario</label><input id="veo-login-username" name="username" class="field" autocomplete="username" required placeholder="Nombre de usuario" /></div><div class="field-group"><label class="field-label" for="veo-login-password">Contraseña</label><input id="veo-login-password" name="password" type="password" class="field" autocomplete="current-password" required placeholder="Contraseña" /></div><label class="auth-show-password"><input type="checkbox" data-toggle-password aria-label="Mostrar contraseña" /><span>Mostrar contraseña</span></label><button class="btn btn-primary" type="submit">ENTRAR AL CRM</button></form><p class="login-footnote">Acceso autorizado VEO</p>${hasLocalDemoData()?'<button type="button" class="btn btn-ghost small mt12" data-action="export-local-backup">RESPALDAR DATOS ANTERIORES DE ESTE DISPOSITIVO</button>':''}</div></div>`}
 function passwordChangeScreen(force=false){
  shell.classList.add('hidden');
- const html=`<div class="auth-wrap"><div class="auth-card"><img class="login-logo" src="${demo?DEMO_LOGO:'/assets/veo_logo.png'}" alt="VEO" /><div class="page-kicker">${force?'PRIMER ACCESO · CAMBIO OBLIGATORIO':'SEGURIDAD DE CUENTA'}</div><h1>${force?'Protege tu cuenta':'Cambiar mi contraseña'}</h1><p>${force?'La contraseña inicial fue asignada por el Administrador. Define una contraseña privada para continuar.':'Sólo tú puedes cambiar tu contraseña personal. El Administrador puede restablecerla, pero no consultarla.'}</p>${changePasswordForm(force)}${force?'<button type="button" class="btn btn-ghost small mt12" data-action="logout">CERRAR SESIÓN Y CAMBIAR DE USUARIO</button>':''}</div></div>`;
+ const html=`<div class="auth-wrap"><div class="auth-card"><img class="login-logo" src="${DEMO_LOGO}" alt="VEO" /><div class="page-kicker">${force?'PRIMER ACCESO · CAMBIO OBLIGATORIO':'SEGURIDAD DE CUENTA'}</div><h1>${force?'Protege tu cuenta':'Cambiar mi contraseña'}</h1><p>${force?'La contraseña inicial fue asignada por el Administrador. Define una contraseña privada para continuar.':'Sólo tú puedes cambiar tu contraseña personal. El Administrador puede restablecerla, pero no consultarla.'}</p>${changePasswordForm(force)}${force?'<button type="button" class="btn btn-ghost small mt12" data-action="logout">CERRAR SESIÓN Y CAMBIAR DE USUARIO</button>':''}</div></div>`;
  loginRoot.innerHTML=html;
 }
 const DEMO_LOGO='/assets/media/logo-veo.png';
@@ -356,8 +230,8 @@ function filtrarFichasAforo(value){
  const counter=document.getElementById('veo-aforo-visible-count');if(counter)counter.textContent=String(count);
  const empty=document.getElementById('veo-aforo-empty');if(empty)empty.hidden=count!==0;
 }
-function renderConfig(){return title('SISTEMA · CUMPLIMIENTO','Reglas de adquisición','Parámetros y políticas del seguimiento de predios.')+`<div class="split-even"><section class="panel"><div class="panel-head"><h2 class="panel-title">Fases administradas</h2></div><div class="panel-content">${PHASES.map((p,i)=>`<div class="list-log"><div class="log-circle" style="color:${COLORS[i]}">${i+1}</div><div><strong>${PHASELABEL[i]}</strong><p>${['Levantamiento de evidencia y puntuación.','Primer contacto y calificación de intención.','Oferta formal con carta de intención.','Contrato condicionado, ingeniería y permisos.'][i]}</p></div></div>`).join('')}</div></section><section class="panel"><div class="panel-head"><h2 class="panel-title">Calificación ponderada /100</h2></div><div class="panel-content">${Object.entries(WEIGHTS).map(([k,v])=>`<div class="bar-row"><span class="bar-label">${E(RATINGLABEL[k])}</span><div class="bar-track"><div class="bar-fill" style="width:${v*3.33}%;background:#23cddd"></div></div><b>${v}%</b></div>`).join('')}<p class="source-footnote mt20">Umbral de ejemplo para solicitar primer avance: 70 puntos. La calificación es la valoración interna del broker, no una certificación de aforo o viabilidad legal.</p></div></section></div><div class="panel mt20"><div class="panel-head"><h2 class="panel-title">Condición suspensiva del contrato</h2></div><div class="panel-content"><div class="alert-box warn"><span>⚖</span><div><b>Regla indispensable:</b> el contrato de ocupación o arrendamiento debe sujetar sus efectos y la posibilidad de operar al permiso municipal aplicable. El dashboard distingue "en cierre" de "apto para operar". El texto contractual definitivo debe ser revisado por el área jurídica y la autoridad municipal competente.</div></div><p class="source-footnote mt20">${demo?'Los registros de esta edición se guardan en este navegador; no utilizarla con información confidencial.':'Los archivos se almacenan en este servidor y el control de acceso se ejecuta en la API. Para acceso por Internet use HTTPS, copias de seguridad, cuenta individual y controles de infraestructura.'}</p></div></div>`}
-function refImage(c,kind='map'){const id=String(c.id).padStart(2,'0');return demo&&window.VEO_DEMO_IMAGES?.[kind]?.[id]|| (kind==='map'?`/assets/mapa_${id}.jpg`:`/assets/lamina_${id}.jpg`)}
+function renderConfig(){return title('SISTEMA · CUMPLIMIENTO','Reglas de adquisición','Parámetros y políticas del seguimiento de predios.')+`<div class="split-even"><section class="panel"><div class="panel-head"><h2 class="panel-title">Fases administradas</h2></div><div class="panel-content">${PHASES.map((p,i)=>`<div class="list-log"><div class="log-circle" style="color:${COLORS[i]}">${i+1}</div><div><strong>${PHASELABEL[i]}</strong><p>${['Levantamiento de evidencia y puntuación.','Primer contacto y calificación de intención.','Oferta formal con carta de intención.','Contrato condicionado, ingeniería y permisos.'][i]}</p></div></div>`).join('')}</div></section><section class="panel"><div class="panel-head"><h2 class="panel-title">Calificación ponderada /100</h2></div><div class="panel-content">${Object.entries(WEIGHTS).map(([k,v])=>`<div class="bar-row"><span class="bar-label">${E(RATINGLABEL[k])}</span><div class="bar-track"><div class="bar-fill" style="width:${v*3.33}%;background:#23cddd"></div></div><b>${v}%</b></div>`).join('')}<p class="source-footnote mt20">Umbral de ejemplo para solicitar primer avance: 70 puntos. La calificación es la valoración interna del broker, no una certificación de aforo o viabilidad legal.</p></div></section></div><div class="panel mt20"><div class="panel-head"><h2 class="panel-title">Condición suspensiva del contrato</h2></div><div class="panel-content"><div class="alert-box warn"><span>⚖</span><div><b>Regla indispensable:</b> el contrato de ocupación o arrendamiento debe sujetar sus efectos y la posibilidad de operar al permiso municipal aplicable. El dashboard distingue "en cierre" de "apto para operar". El texto contractual definitivo debe ser revisado por el área jurídica y la autoridad municipal competente.</div></div><p class="source-footnote mt20">${demo?'Los registros de esta edición se guardan en este navegador; no utilizarla con información confidencial.':'Los archivos se almacenan en un servicio privado y el control de acceso se valida en la API. Mantén respaldos periódicos y sesiones individuales.'}</p></div></div>`}
+function refImage(c,kind='map'){const id=String(c.id).padStart(2,'0');return window.VEO_DEMO_IMAGES?.[kind]?.[id]|| (kind==='map'?`/assets/mapa_${id}.jpg`:`/assets/lamina_${id}.jpg`)}
 
 // Consultas y enlaces de Google Maps. No se inventan coordenadas para los nodos del estudio.
 function googleQuery(c){return c?`${c.candidate_node}, ${c.name}, Nuevo León, México`:'Monterrey, Nuevo León, México'}
@@ -463,7 +337,7 @@ function mostrarAforo(id){
     <footer class="aforo-pie">
       <span>Imagen del estudio original. Sus aforos son estimaciones y no indican coordenadas exactas de predios.</span>
       <span class="aforo-ayuda">Desliza para recorrer la lámina · Amplía hasta 300%</span>
-      ${!demo?'<a class="btn btn-ghost small" href="/fuente.pdf#page='+c.page+'" target="_blank" rel="noopener">VER PDF ORIGINAL ↗</a>':''}
+
     </footer>
   </section>`;
   const lienzo=document.getElementById('aforo-lienzo');
@@ -743,11 +617,7 @@ async function action(target){const cmd=target.dataset.action,id=+target.dataset
   if(cmd==='close-command'){closeCommand();return}
   if(cmd==='command-predio'){closeCommand();await openPredio(id);return}
   if(cmd==='command-corridor'){closeCommand();state.selectedCorridor=id;state.view='mapa';state.mapProvider='veo';render();window.scrollTo(0,0);return}
-  if(cmd==='reset-demo-login'){
-   if(!demo)return;
-   if(!confirm('¿Restablecer la contraseña inicial de ADMIN en esta demostración? Se cerrará la sesión actual, pero los predios y documentos permanecerán. NO afecta otras computadoras.'))return;
-   await resetDemoAdminAccess();return;
-  }
+  if(cmd==='export-local-backup'){await exportLocalBackup();toast('Respaldo generado. Guárdalo en un lugar privado; incluye datos locales y registros de prueba.');return}
   if(cmd==='logout'){await api('/api/logout',{method:'POST',body:'{}'});closeDrawer();loginScreen();return}
   if(cmd==='new-predio'){showCreate();return}
   if(cmd==='map-new-location'){showCreate();openLocationPicker('create');return}
@@ -861,7 +731,16 @@ async function forms(form){const cmd=form.dataset.form;let d=fields(form);const 
  if(cmd==='save-predio'){const checkPoint=d.lat&&d.lng?normalizePoint(d.lat,d.lng):null;const old=state.drawer?.predio;if(checkPoint&&old&&(String(old.corridor_id)!==String(d.corridor_id)||Math.abs(+old.lat-checkPoint.lat)>0.0000008||Math.abs(+old.lng-checkPoint.lng)>0.0000008)){await assertCorridorPoint(+d.corridor_id,checkPoint)}const body={...d,broker_id:d.broker_id?+d.broker_id:null,corridor_id:+d.corridor_id,lat:d.lat!==''&&d.lat!=null?+d.lat:null,lng:d.lng!==''&&d.lng!=null?+d.lng:null,clausula_condicional:!!form.querySelector('[name="clausula_condicional"]').checked};delete body.code;if(!['admin','supervisor','legal'].includes(state.user.role))delete body.permiso_status;if(state.user.role==='broker')delete body.broker_id;await save(`/api/predios/${pid}`,'PATCH',body);await refresh(true);toast('Datos del predio actualizados.');return}
  if(cmd==='save-score'){const ratings={};for(let k of Object.keys(WEIGHTS))ratings[k]=Number(d[k]||0);await save(`/api/predios/${pid}`,'PATCH',{ratings_json:JSON.stringify(ratings)});await refresh(true);toast('Calificación guardada.');return}
  if(cmd==='add-comment'){if(!d.body?.trim())throw Error('Escriba un comentario');await save(`/api/predios/${pid}/comments`,'POST',{body:d.body});await refresh(true);toast('Comentario registrado en bitácora.');return}
- if(cmd==='upload-doc'){const file=form.querySelector('input[name="file"]').files[0];if(!file)throw Error('Seleccione un archivo');if(file.size>60*1024*1024&&!demo)throw Error('El archivo supera 60MB');const body=new FormData(form);await api(`/api/predios/${pid}/documents`,{method:'POST',body});await refresh(true);toast('Documento adjuntado al expediente.');return}
+ if(cmd==='upload-doc'){
+  const file=form.querySelector('input[name="file"]').files[0];
+  if(!file)throw Error('Selecciona un archivo.');
+  if(file.size>45*1024*1024)throw Error('El archivo supera el máximo de 45 MB.');
+  const signed=await api(`/api/predios/${pid}/documents/sign`,{method:'POST',body:JSON.stringify({doc_type:d.doc_type,original_filename:file.name,size_bytes:file.size})});
+  const uploaded=await fetch(signed.url,{method:'PUT',headers:{'Content-Type':file.type||'application/octet-stream'},body:file});
+  if(!uploaded.ok)throw Error('No se pudo cargar el archivo al almacenamiento seguro ('+uploaded.status+').');
+  await api(`/api/predios/${pid}/documents/complete`,{method:'POST',body:JSON.stringify({doc_type:d.doc_type,original_filename:file.name,storage_path:signed.storage_path})});
+  await refresh(true);toast('Documento adjuntado y disponible para el equipo.');return;
+ }
 }
 document.addEventListener('input',ev=>{
  if(ev.target?.id==='picker-corridor-query')pickerCorridorOptions(ev.target.value);
@@ -870,5 +749,7 @@ document.addEventListener('focusin',ev=>{
  if(ev.target?.id==='picker-corridor-query')pickerCorridorOptions(ev.target.value.replace(/^\d{2}\s*·\s*/,''));
 });
 document.addEventListener('submit',async ev=>{const form=ev.target.closest('form[data-form]');if(!form)return;ev.preventDefault();const btn=form.querySelector('[type="submit"]');if(btn){btn.disabled=true;btn.dataset.old=btn.textContent;btn.textContent='PROCESANDO…'}try{await forms(form)}catch(e){toast(e.message,true);if(btn){btn.disabled=false;btn.textContent=btn.dataset.old}}});
-(async()=>{try{if(demo)await initDemo();if(demo&&!demoSession){loginScreen();return}await loadAll()}catch(err){console.warn('Sesión no disponible:',err.message);loginScreen()}})();
+(async()=>{try{await loadAll()}catch(err){console.warn('Sesión no disponible:',err.message);loginScreen()}})();
 
+
+// Consola: localStorage.getItem('veo_territorios_demo_v1') conserva la copia local previa.

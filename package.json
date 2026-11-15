@@ -1,0 +1,8 @@
+{
+  "name": "veo-territorios-multiusuario",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CRM VEO Territorios con API en Vercel y base de datos Supabase",
+  "scripts": {"test": "node --test tests/backend.test.cjs", "check": "node --check api/main.js && node --check public/assets/crm.js"},
+  "engines": {"node": ">=20"}
+}
