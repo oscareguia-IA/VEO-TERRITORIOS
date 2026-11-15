@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#08152b" />
+<meta name="description" content="VEO TERRITORIOS — CRM geográfico DOOH, versión HTML para celular y tablet. Los mapas en línea requieren conexión." />
+<title>VEO TERRITORIOS · Versión móvil</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+
+
+
+
+
+
+
+<link rel="icon" type="image/png" href="/assets/media/veo-icon-32.png" />
+<link rel="apple-touch-icon" href="/assets/media/veo-icon-180.png" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<meta name="robots" content="noindex,nofollow" />
+<link rel="stylesheet" href="/assets/app.css" />
+</head>
+<body>
+<div id="login-root"></div>
+<div id="shell" class="shell hidden">
+ <div id="sidebar-backdrop" class="sidebar-backdrop" aria-hidden="true"></div>
+ <aside class="sidebar">
+  <button type="button" class="brand brand-home" data-action="nav" data-view="dashboard" title="Volver al Centro de control" aria-label="VEO · Ir al inicio"><img class="brand-logo" src="/assets/media/logo-veo.png" alt="VEO" /><span class="brand-identity"><strong>TERRITORIOS</strong><small>DOOH · ACQUISITION CRM</small></span></button>
+  <div class="side-eyebrow">OPERACIÓN</div>
+  <nav id="main-nav" class="nav"></nav>
+  <div class="side-bottom">
+   <div class="source-mini"><span class="source-dot"></span><span><strong>14 corredores metropolitanos</strong><small>Base estratégica · noviembre 2026</small></span></div>
+   <div class="profile" id="side-profile"></div>
+  </div>
+ </aside>
+ <div class="workspace">
+  <header class="topbar"><div class="topbar-left"><button class="icon-btn mobile-only" data-action="toggle-menu" aria-label="Abrir menú">☰</button><button type="button" class="header-home-logo" data-action="nav" data-view="dashboard" title="VEO · Inicio" aria-label="Volver al Centro de control"><img src="/assets/media/logo-veo.png" alt="VEO" /></button><span class="top-crumb">VEO <span>/</span> ADQUISICIÓN TERRITORIAL</span><span class="top-tag">MONTERREY · AMM</span></div><div class="top-actions"><button class="top-search" data-action="open-command" title="Buscar predios, corredores y secciones (Ctrl+K)" aria-label="Buscar en VEO">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg><span class="search-label">Buscar en VEO</span><span class="keycap">Ctrl K</span></button><button class="btn btn-primary small" data-action="new-predio"><span>＋</span> REGISTRAR PREDIO</button></div></header>
+  <main class="main" id="view"></main>
+  <nav id="mobile-nav" class="mobile-nav" aria-label="Navegación rápida"></nav>
+ </div>
+</div>
+<div id="command-layer" class="hidden"></div>
+<div id="modal" class="modal-root"></div><div id="location-picker" class="location-picker-root"></div><div id="drawer" class="drawer-root"></div><div id="toast" class="toast hidden"></div>
+
+
+
+
+
+
+
+<script defer src="/assets/datos-corredores.js"></script>
+<script defer src="/assets/mapa-fluido.js"></script>
+<script defer src="/assets/geoverificacion.js"></script>
+<script defer src="/assets/trazados.js"></script>
+<script defer src="/assets/crm.js?v=20261114-mapa-full"></script>
+<script defer src="/assets/gestos-moviles.js"></script>
+<script defer src="/assets/pwa.js"></script>
+</body></html>
