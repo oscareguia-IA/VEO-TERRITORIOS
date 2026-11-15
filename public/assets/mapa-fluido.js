@@ -136,11 +136,11 @@ class VEOMapNative{
   const {w,h}=this.getSize(),c=merc(this.center.lat,this.center.lng,this.zoom),seen=new Set();
   for(const item of this.markers){
    if(!Number.isFinite(item.lat)||!Number.isFinite(item.lng))continue;
-   const k=String(item.id),p=merc(item.lat,item.lng,this.zoom),x=w/2+p.x-c.x,y=h/2+p.y-c.y;
+   const k=String(item.key||item.id),p=merc(item.lat,item.lng,this.zoom),x=w/2+p.x-c.x,y=h/2+p.y-c.y;
    if(x < -240||x>w+240||y < -240||y>h+240)continue;
    seen.add(k);let wrap=this.markerNodes.get(k);
    if(!wrap){
-    wrap=document.createElement('div');wrap.className='veo-pin-wrap';
+    wrap=document.createElement('div');wrap.className='veo-pin-wrap'+(item.kind==='foto'?' veo-photo-wrap':'');
     const label=document.createElement('div');label.className='veo-pin-name';wrap.append(label);
     const b=document.createElement('button');b.type='button';b.className='veo-opportunity-marker';b.dataset.opportunityId=item.id;
     b.innerHTML='<span class="veo-opportunity-marker-core"></span>';wrap.append(b);

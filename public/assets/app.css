@@ -807,3 +807,12 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
  .map-overlay-top .chip,.map-overlay-top .streets-only-chip{font-size:9px;padding:7px}
  .map-overlay-bottom{left:8px;bottom:9px;max-width:calc(100% - 78px)}
 }
+
+/* Fotos georreferenciadas */
+.doc-geo{display:block;margin-top:4px;color:#7fe3dc;font-size:12px}
+.doc-geo-missing{color:#f5b85a}
+.doc-geo-far{color:#f5b85a;font-weight:600}
+.doc-geo-btn{margin-top:6px;display:inline-flex}
+.veo-pin-wrap.veo-photo-wrap .veo-opportunity-marker{width:14px;height:14px;transform:translate(-50%,-50%);border-radius:50%;border-width:2px}
+.veo-pin-wrap.veo-photo-wrap .veo-opportunity-marker-core{display:none}
+.veo-pin-wrap.veo-photo-wrap .veo-pin-name{display:none}
