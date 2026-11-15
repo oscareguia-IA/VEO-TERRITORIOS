@@ -11,7 +11,7 @@ const B={
  9:[25.604,-100.283,25.704,-100.113],10:[25.595,-100.271,25.707,-100.124],
  11:[25.703,-100.483,25.812,-100.162],12:[25.736,-100.515,25.828,-100.308],
  13:[25.642,-100.336,25.750,-100.260],14:[25.663,-100.366,25.701,-100.267]};
-const P={1:'Leones',2:'Garza Sada',3:'Constituci',4:'Lázaro|Lazaro|Cárdenas|Cardenas',5:'Gonzalitos|González|Gonzalez',6:'Morones Prieto',7:'Nogalar',8:'Alemán|Aleman',9:'Pablo Livas',10:'Juárez|Juarez',11:'Ruiz Cortines',12:'Lincoln',13:'Félix|Felix',14:'Madero'};
+const P={1:'Leones',2:'Garza Sada',3:'Constituci',4:'Lázaro|Lazaro|Cárdenas|Cardenas',5:'Gonzalitos|González|Gonzalez',6:'Morones Prieto',7:'Nogalar',8:'Alemán|Aleman',9:'Pablo Livas',10:'Juárez|Juarez',11:'Ruiz Cortines',12:'Lincoln',13:'Uresti|Félix|Felix',14:'Madero'};
 const mem=new Map(),pending=new Map(),expire=7*24*3600*1000;
 function store(id,data){if(data?.lines?.length){mem.set(+id,data);try{localStorage.setItem('veo_route_osm_'+id,JSON.stringify({ts:Date.now(),data}))}catch(_){}}return data}
 function cached(id){if(mem.has(+id))return mem.get(+id);try{const raw=JSON.parse(localStorage.getItem('veo_route_osm_'+id)||'null');if(raw?.data?.lines?.length){const item={...raw.data,status:Date.now()-raw.ts>expire?'cached':raw.data.status};mem.set(+id,item);return item}}catch(_){}return null}
