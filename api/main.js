@@ -58,8 +58,17 @@ const reqItems=(p,docs,to)=>{const found=t=>docs.some(x=>x.doc_type===t),items=[
  if(to==='CIERRE'){push('Carta de intención presentada',found('carta_intencion'));push('Interés confirmado del propietario',p.interes==='interesado');push('Condición de permiso municipal explicada',p.clausula_condicional)}return items;
 };
 function readiness(p,docs){const x=[['contrato','Contrato firmado / condicionado'],['mecanica_suelos','Estudio de mecánica de suelos'],['memoria_calculo','Memoria de cálculo estructural'],['factibilidad_electrica','Factibilidad eléctrica'],['permiso_municipal','Documento de permiso municipal']].map(([key,label])=>({key,label,done:docs.some(d=>d.doc_type===key)}));x.push({key:'permiso',label:'Permiso municipal autorizado',done:p.permiso_status==='autorizado'},{key:'clausula',label:'Cláusula suspensiva reconocida',done:!!p.clausula_condicional});return {complete:p.phase==='CIERRE'&&x.every(q=>q.done),items:x}}
-async function login(body,res){
+// ── Límite de intentos (anti fuerza bruta) ──
+const LOGIN_USER_MAX=5, LOGIN_IP_MAX=20, LOGIN_WINDOW_S=900, LOGIN_LOCK_S=900;
+const DUMMY_HASH='scrypt$00000000000000000000000000000000000000$'+'0'.repeat(128);
+const clientIp=req=>String(req?.headers?.['x-real-ip']||String(req?.headers?.['x-forwarded-for']||'').split(',')[0]||'desconocida').trim().slice(0,64);
+async function rpc(fn,args){try{return await rest('rpc/'+fn,{method:'POST',data:args})}catch(e){console.error('VEO_RATE_LIMIT',fn,e.message);return null}}
+function tooMany(res,secs){res.setHeader('Retry-After',String(secs));return codeError(429,`Demasiados intentos fallidos. Espera ${Math.ceil(secs/60)} minutos e inténtalo de nuevo.`)}
+async function login(body,res,req){
  const username=cleanText(body.username,50).toLowerCase();ensure(username&&body.password,'Introduce usuario y contraseña.');
+ const ip=clientIp(req),userKey='u:'+username,ipKey='ip:'+ip;
+ const wait=Number(await rpc('veo_login_check',{p_keys:[userKey,ipKey]}))||0;
+ if(wait>0)throw tooMany(res,wait);
  let u=await one('veo_users',{username:`eq.${username}`});
  // Sólo al iniciar la instalación, ADMIN se registra con la contraseña secreta del entorno.
  if(!u&&username==='admin'&&process.env.VEO_ADMIN_BOOTSTRAP_PASSWORD){const others=await list('veo_users',{limit:1});if(others.length===0){
@@ -67,7 +76,14 @@ async function login(body,res){
   ensure(String(body.password).length>=12,'La contraseña de arranque requiere 12 caracteres.',400);
   try{u=await add('veo_users',{username:'admin',display_name:'Administrador VEO',role:'admin',active:true,must_change_password:true,password_hash:await hashPassword(body.password)});}catch(e){u=await one('veo_users',{username:'eq.admin'})}
  }}
- const match=u&&u.active&&await checkPassword(body.password,u.password_hash);ensure(match,'Credenciales incorrectas.',401);
+ const match=u&&u.active?await checkPassword(body.password,u.password_hash):(await checkPassword(body.password,DUMMY_HASH),false);
+ if(!match){
+  const [lu,li]=await Promise.all([rpc('veo_login_fail',{p_key:userKey,p_max:LOGIN_USER_MAX,p_window_s:LOGIN_WINDOW_S,p_lock_s:LOGIN_LOCK_S}),rpc('veo_login_fail',{p_key:ipKey,p_max:LOGIN_IP_MAX,p_window_s:LOGIN_WINDOW_S,p_lock_s:LOGIN_LOCK_S})]);
+  const locked=Math.max(Number(lu)||0,Number(li)||0);
+  if(locked>0)throw tooMany(res,locked);
+  throw codeError(401,'Credenciales incorrectas.');
+ }
+ await rpc('veo_login_reset',{p_key:userKey});
  setSession(res,u);return {ok:true};
 }
 async function session(req,res){const token=getCookie(req,COOKIE),sess=token&&decodeSession(token);ensure(sess,'Inicia sesión.',401);
@@ -99,7 +115,7 @@ async function handle(req,res){
  ensure(['GET','POST','PATCH','DELETE'].includes(method),'Método no permitido.',405);env();
  if(method!=='GET')validateOrigin(req);
  if(key==='health'&&method==='GET'){await list('veo_users',{select:'id',limit:1});return {ok:true,service:'veo-territorios',mode:'multiusuario',database:'connected'};}
- if(key==='login'&&method==='POST')return login(req.body||{},res);
+ if(key==='login'&&method==='POST')return login(req.body||{},res,req);
  const {u:me,csrf}=await session(req,res);
  if(method!=='GET')ensure(req.headers['x-csrf-token']===csrf,'Token de seguridad inválido. Recarga la aplicación.',403);
  const b=req.body||{};
