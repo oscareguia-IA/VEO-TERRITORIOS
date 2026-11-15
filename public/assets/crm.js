@@ -422,24 +422,12 @@ function pickerCoords(point){
 }
 let pickerCheckTimer=null;
 function updatePickerVerificationUI(){
- const pk=state.picker,el=document.getElementById('picker-validation'),btn=document.getElementById('picker-confirm');if(!pk)return;
- let result=pk.validation;
- if(el){el.className='picker-validation '+(result?.status||'pending');el.textContent=pk.point?(result?.message||'Pin seleccionado. Verificando que corresponda al corredor...'):'Selecciona una ubicación para validar el corredor.'}
- if(btn){btn.disabled=!pk.point||!['validated','unavailable'].includes(result?.status);btn.textContent=result?.status==='unavailable'?'✓ USAR UBICACIÓN PENDIENTE':'✓ USAR ESTA UBICACIÓN'}
+ const pk=state.picker,btn=document.getElementById('picker-confirm');if(!pk)return;
+ if(btn){btn.disabled=!pk.point;btn.textContent='✓ USAR ESTA UBICACIÓN'}
 }
 async function pickerValidatePoint(point){
  const pk=state.picker;if(!pk||!point)return;
- clearTimeout(pickerCheckTimer);
- const token=pk.validationToken=(pk.validationToken||0)+1;
- pk.validation={status:'pending',ok:false,message:'Comparando coordenadas GPS con el trazado georreferenciado de la avenida...'};updatePickerVerificationUI();
- pickerCheckTimer=setTimeout(async()=>{
-  let result;
-  try{result=await validateCorridorPoint(pk.corridorId,point)}catch(e){result={status:'unavailable',ok:false,message:'No se pudo completar la verificación geográfica. Vuelve a intentar.'}}
-  if(state.picker!==pk||token!==pk.validationToken)return;
-  pk.validation=result;
-  if(result.ok||result.status==='unavailable')veoGeoProof={...result,corridor_id:pk.corridorId,lat:point.lat,lng:point.lng,checkedAt:Date.now()};
-  updatePickerVerificationUI();
- },120);
+ pk.validation={status:'validated',ok:true};updatePickerVerificationUI();
 }
 function pickerSetPin(point,{fly=false}={}){
  const pk=state.picker;if(!pk||!point)return;
@@ -507,6 +495,14 @@ function openNativePicker(pk){
  if(pk.routeData?.lines?.length)pk.map.setRoute(pk.routeData.lines,{color:ROUTE_HIGHLIGHT_COLOR});
  const info=document.getElementById('picker-provider-note');if(info)info.textContent='Mapa de calles Esri · navegación interactiva, búsqueda y captura precisa del pin GPS.';
 }
+function pickerExistingPins(pk,gm){
+ const editingId=pk.origin==='edit'?state.drawer?.predio?.id:null;
+ pk.existingMarkers=(state.data?.predios||[]).filter(p=>p.id!==editingId&&p.lat!=null&&p.lng!=null&&Number.isFinite(+p.lat)&&Number.isFinite(+p.lng)).map(p=>new gm.Marker({
+  map:pk.googleMap,position:{lat:+p.lat,lng:+p.lng},title:`${p.code} · ${p.alias}`,clickable:false,zIndex:1,
+  icon:{path:gm.SymbolPath.CIRCLE,scale:7,fillColor:phaseColor(p.phase),fillOpacity:.95,strokeColor:'#ffffff',strokeWeight:2,labelOrigin:new gm.Point(0,-3.2)},
+  label:{text:String(p.alias||'').slice(0,22),className:'veo-gmap-label veo-picker-label',color:'#ffffff',fontSize:'11px',fontWeight:'700'}
+ }));
+}
 async function openGooglePicker(pk,key){
  const info=document.getElementById('picker-provider-note');if(info)info.textContent='Conectando con Google Maps…';
  try{
@@ -516,6 +512,7 @@ async function openGooglePicker(pk,key){
   const el=document.getElementById('picker-map');el.innerHTML='';
   pk.googleMap=new gm.Map(el,{center:pk.point||{lat:25.6866,lng:-100.3161},zoom:pk.point?17:12,mapTypeId:'roadmap',streetViewControl:false,mapTypeControl:false,fullscreenControl:false,clickableIcons:false,gestureHandling:'greedy'});
   pk.googleMap.addListener('click',event=>pickerSetPin(normalizePoint(event.latLng.lat(),event.latLng.lng())));
+  pickerExistingPins(pk,gm);
   if(pk.point)pickerSetPin(pk.point);
   if(pk.routeData?.lines?.length)setGoogleCorridorRoute(pk,pk.routeData);
   if(pk.corridorId)highlightPickerCorridor(pk.corridorId);
@@ -547,7 +544,7 @@ function openLocationPicker(origin='create'){
  <div class="picker-map-toolbar"><div id="picker-corridor-current" class="picker-corridor-current">Selecciona un corredor para enfocar su sector; después marca el predio en el mapa.</div><span class="streets-only-chip">▣ CALLES</span></div>
  <div class="picker-source-tip"><span id="picker-provider-note">${key?'Conectando con Google Maps…':'Mapa de calles Esri (respaldo CARTO) · desplazamiento, zoom e inercia.'}</span></div>
  <div id="picker-results" class="picker-results" aria-live="polite"></div><div class="veo-route-guide"><span class="veo-route-swatch"></span><span>La avenida seleccionada se marca en <b>rosa</b>, usando su trazado cartográfico real.</span><span id="picker-route-status" class="veo-route-status">Selecciona un corredor para ver el trazado.</span><button type="button" data-action="retry-corridor-shape" class="veo-route-retry">↻ Reintentar trazo</button></div><div class="picker-map-wrap"><div id="picker-map" class="picker-map" role="application" aria-label="Mapa para marcar predio"></div><div class="picker-map-hint">⌖ Clic para fijar el pin · Arrastra para ajustar</div></div>
- <div class="picker-validation pending" id="picker-validation" role="status" aria-live="polite">Selecciona una ubicación para validar el corredor.</div><div class="picker-verification-tip">Si el servicio de trazados viales falla, podrás registrar la ubicación como <strong>PENDIENTE</strong>; no se aprobará ni avanzará de fase hasta verificarla.</div><div class="picker-footer"><div class="picker-coordinate-panel"><div id="picker-coordinates" class="picker-coordinates" aria-live="polite"></div><details class="picker-manual"><summary>Capturar coordenadas GPS manualmente</summary><div class="picker-manual-row"><input class="field" id="picker-manual-lat" type="number" min="-90" max="90" step="any" placeholder="Latitud" aria-label="Latitud manual"/><input class="field" id="picker-manual-lng" type="number" min="-180" max="180" step="any" placeholder="Longitud" aria-label="Longitud manual"/><button type="button" class="btn btn-ghost small" data-action="picker-manual">APLICAR GPS</button></div></details></div><div class="picker-footer-actions"><a id="picker-google-link" class="btn btn-ghost picker-google-link hidden" target="_blank" rel="noopener noreferrer" title="Abrir el pin seleccionado en Google Maps">VER EN GOOGLE MAPS ↗</a><button type="button" class="btn btn-ghost" data-action="picker-cancel">CANCELAR</button><button type="button" class="btn btn-primary" id="picker-confirm" data-action="picker-confirm" disabled>✓ USAR ESTA UBICACIÓN</button></div></div>
+ <div class="picker-footer"><div class="picker-coordinate-panel"><div id="picker-coordinates" class="picker-coordinates" aria-live="polite"></div><details class="picker-manual"><summary>Capturar coordenadas GPS manualmente</summary><div class="picker-manual-row"><input class="field" id="picker-manual-lat" type="number" min="-90" max="90" step="any" placeholder="Latitud" aria-label="Latitud manual"/><input class="field" id="picker-manual-lng" type="number" min="-180" max="180" step="any" placeholder="Longitud" aria-label="Longitud manual"/><button type="button" class="btn btn-ghost small" data-action="picker-manual">APLICAR GPS</button></div></details></div><div class="picker-footer-actions"><a id="picker-google-link" class="btn btn-ghost picker-google-link hidden" target="_blank" rel="noopener noreferrer" title="Abrir el pin seleccionado en Google Maps">VER EN GOOGLE MAPS ↗</a><button type="button" class="btn btn-ghost" data-action="picker-cancel">CANCELAR</button><button type="button" class="btn btn-primary" id="picker-confirm" data-action="picker-confirm" disabled>✓ USAR ESTA UBICACIÓN</button></div></div>
  </section>`;
  pickerCoords(existing);
  if(existing)pickerValidatePoint(existing);
@@ -572,16 +569,14 @@ async function pickerSearch(){
 }
 function confirmLocationPicker(){
  const pk=state.picker;if(!pk?.point){toast('Selecciona primero un pin en el mapa.',true);return}
- if(!['validated','unavailable'].includes(pk.validation?.status)){toast('El punto está fuera del corredor o falta terminar la verificación.',true);return}
- if(pk.validation.status==='unavailable'&&!confirm('No se pudo comprobar la avenida con el servicio de mapas. ¿Deseas guardar el predio con validación PENDIENTE? No podrá avanzar de fase hasta ser corroborado.'))return;
- const form=document.querySelector(pk.origin==='edit'?'form[data-form="save-predio"]':'form[data-form="create-predio"]');
+  const form=document.querySelector(pk.origin==='edit'?'form[data-form="save-predio"]':'form[data-form="create-predio"]');
  if(!form)return;
  const lat=form.querySelector('[name="lat"]'),lng=form.querySelector('[name="lng"]');
  lat.value=pk.point.lat.toFixed(7);lng.value=pk.point.lng.toFixed(7);
  if(pk.origin==='create'){
   state.pin={...pk.point};
   const note=document.getElementById('location-selection-note'),callout=document.querySelector('.location-callout');
-  if(note)note.textContent=`${lat.value}, ${lng.value} · ${pk.validation.status==='unavailable'?'VALIDACIÓN PENDIENTE: podrá guardarse, pero no avanzar de fase.':'Ubicación registrada.'}`;
+  if(note)note.textContent=`${lat.value}, ${lng.value}`;
   if(callout){callout.classList.add('ready');callout.querySelector('strong').textContent='Ubicación geográfica seleccionada'}
  } else {
   toast('Pin aplicado al expediente. Pulsa GUARDAR CAMBIOS para guardar la ubicación.');
