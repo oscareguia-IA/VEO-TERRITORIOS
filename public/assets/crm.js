@@ -15,7 +15,29 @@ const initials=s=>String(s||'V').trim().split(/\s+/).slice(0,2).map(x=>x.charAt(
 const fmt=n=>Number(n||0).toLocaleString('es-MX');
 let veoGeoProof=null;
 const veoGeoEqual=(p,id,lat,lng)=>p&&(p.ok||(p.status==='unavailable'&&Date.now()-p.checkedAt<120000))&&+p.corridor_id===+id&&Math.abs(+p.lat-lat)<0.0000008&&Math.abs(+p.lng-lng)<0.0000008;
-async function validateCorridorPoint(){return {ok:true,status:'ok',message:'Ubicación registrada.'}} // verificación desactivada
+const CORRIDOR_MAX_M=150; // tolerancia: el predio puede estar a pie de avenida
+function distToLinesM(point,lines){
+ const R=6371000,rad=Math.PI/180,k=Math.cos(point.lat*rad);let best=Infinity;
+ const xy=p=>[(p[1]-point.lng)*rad*R*k,(p[0]-point.lat)*rad*R];
+ for(const line of lines||[])for(let i=0;i<line.length-1;i++){
+  const [ax,ay]=xy(line[i]),[bx,by]=xy(line[i+1]),dx=bx-ax,dy=by-ay,L=dx*dx+dy*dy;
+  let t=L?-(ax*dx+ay*dy)/L:0;t=Math.max(0,Math.min(1,t));
+  const d=Math.hypot(ax+t*dx,ay+t*dy);if(d<best)best=d;
+ }
+ return best;
+}
+const fmtDist=m=>m<1000?Math.round(m)+' m':(m/1000).toFixed(1)+' km';
+function corridorLineCheck(corridorId,point,lines){
+ if(!corridorId)return {ok:false,status:'outside',message:'Selecciona primero el corredor del predio.'};
+ if(!lines?.length)return {ok:true,status:'validated',noLine:true};
+ const d=distToLinesM(point,lines);
+ if(d<=CORRIDOR_MAX_M)return {ok:true,status:'validated',distance:d};
+ return {ok:false,status:'outside',distance:d,message:`El pin está a ${fmtDist(d)} de la línea del corredor ${cname(corridorId)}. Acomoda el pin sobre la línea rosa para poder registrar la oportunidad.`};
+}
+async function validateCorridorPoint(corridorId,point){
+ let lines=null;try{lines=(await window.VEORoutes?.load(+corridorId,{demo:true}))?.lines}catch(_){}
+ return corridorLineCheck(+corridorId,point,lines);
+}
 async function validateCorridorPointOriginal(corridorId,point){
  if(!point||!corridorId)return {ok:false,status:'outside',message:'Selecciona corredor y pin GPS.'};
  if(demo)return await window.VEOCorridorGeo.validate(corridorId,point);
@@ -67,7 +89,7 @@ function setGoogleCorridorRoute(pk,result){
 }
 async function highlightPickerCorridor(id){
  const pk=state.picker;if(!pk)return;const token=pk.routeToken=(pk.routeToken||0)+1;
- pk.map?.setRoute([],{});setGoogleCorridorRoute(pk,null);
+ pk.routeData=null;pk.map?.setRoute([],{});setGoogleCorridorRoute(pk,null);if(pk.point)pickerValidatePoint(pk.point);
  const status=document.getElementById('picker-route-status');showRouteStatus(status,{status:'loading'});
  const result=await window.VEORoutes.load(id,{demo:true});
  if(state.picker!==pk||pk.corridorId!==+id||pk.routeToken!==token)return;
@@ -422,12 +444,14 @@ function pickerCoords(point){
 }
 let pickerCheckTimer=null;
 function updatePickerVerificationUI(){
- const pk=state.picker,btn=document.getElementById('picker-confirm');if(!pk)return;
- if(btn){btn.disabled=!pk.point;btn.textContent='✓ USAR ESTA UBICACIÓN'}
+ const pk=state.picker,btn=document.getElementById('picker-confirm'),alert=document.getElementById('picker-corridor-alert');if(!pk)return;
+ const bad=pk.point&&pk.validation?.status==='outside';
+ if(btn){btn.disabled=!pk.point||bad;btn.textContent='✓ USAR ESTA UBICACIÓN'}
+ if(alert){alert.hidden=!bad;alert.textContent=bad?'⚠ '+pk.validation.message:''}
 }
 async function pickerValidatePoint(point){
  const pk=state.picker;if(!pk||!point)return;
- pk.validation={status:'validated',ok:true};updatePickerVerificationUI();
+ pk.validation=corridorLineCheck(pk.corridorId,point,pk.routeData?.lines);updatePickerVerificationUI();
 }
 function pickerSetPin(point,{fly=false}={}){
  const pk=state.picker;if(!pk||!point)return;
@@ -544,7 +568,7 @@ function openLocationPicker(origin='create'){
  <div class="picker-map-toolbar"><div id="picker-corridor-current" class="picker-corridor-current">Selecciona un corredor para enfocar su sector; después marca el predio en el mapa.</div><span class="streets-only-chip">▣ CALLES</span></div>
  <div class="picker-source-tip"><span id="picker-provider-note">${key?'Conectando con Google Maps…':'Mapa de calles Esri (respaldo CARTO) · desplazamiento, zoom e inercia.'}</span></div>
  <div id="picker-results" class="picker-results" aria-live="polite"></div><div class="veo-route-guide"><span class="veo-route-swatch"></span><span>La avenida seleccionada se marca en <b>rosa</b>, usando su trazado cartográfico real.</span><span id="picker-route-status" class="veo-route-status">Selecciona un corredor para ver el trazado.</span><button type="button" data-action="retry-corridor-shape" class="veo-route-retry">↻ Reintentar trazo</button></div><div class="picker-map-wrap"><div id="picker-map" class="picker-map" role="application" aria-label="Mapa para marcar predio"></div><div class="picker-map-hint">⌖ Clic para fijar el pin · Arrastra para ajustar</div></div>
- <div class="picker-footer"><div class="picker-coordinate-panel"><div id="picker-coordinates" class="picker-coordinates" aria-live="polite"></div><details class="picker-manual"><summary>Capturar coordenadas GPS manualmente</summary><div class="picker-manual-row"><input class="field" id="picker-manual-lat" type="number" min="-90" max="90" step="any" placeholder="Latitud" aria-label="Latitud manual"/><input class="field" id="picker-manual-lng" type="number" min="-180" max="180" step="any" placeholder="Longitud" aria-label="Longitud manual"/><button type="button" class="btn btn-ghost small" data-action="picker-manual">APLICAR GPS</button></div></details></div><div class="picker-footer-actions"><a id="picker-google-link" class="btn btn-ghost picker-google-link hidden" target="_blank" rel="noopener noreferrer" title="Abrir el pin seleccionado en Google Maps">VER EN GOOGLE MAPS ↗</a><button type="button" class="btn btn-ghost" data-action="picker-cancel">CANCELAR</button><button type="button" class="btn btn-primary" id="picker-confirm" data-action="picker-confirm" disabled>✓ USAR ESTA UBICACIÓN</button></div></div>
+ <div id="picker-corridor-alert" class="picker-corridor-alert" role="alert" hidden></div><div class="picker-footer"><div class="picker-coordinate-panel"><div id="picker-coordinates" class="picker-coordinates" aria-live="polite"></div><details class="picker-manual"><summary>Capturar coordenadas GPS manualmente</summary><div class="picker-manual-row"><input class="field" id="picker-manual-lat" type="number" min="-90" max="90" step="any" placeholder="Latitud" aria-label="Latitud manual"/><input class="field" id="picker-manual-lng" type="number" min="-180" max="180" step="any" placeholder="Longitud" aria-label="Longitud manual"/><button type="button" class="btn btn-ghost small" data-action="picker-manual">APLICAR GPS</button></div></details></div><div class="picker-footer-actions"><a id="picker-google-link" class="btn btn-ghost picker-google-link hidden" target="_blank" rel="noopener noreferrer" title="Abrir el pin seleccionado en Google Maps">VER EN GOOGLE MAPS ↗</a><button type="button" class="btn btn-ghost" data-action="picker-cancel">CANCELAR</button><button type="button" class="btn btn-primary" id="picker-confirm" data-action="picker-confirm" disabled>✓ USAR ESTA UBICACIÓN</button></div></div>
  </section>`;
  pickerCoords(existing);
  if(existing)pickerValidatePoint(existing);
@@ -569,6 +593,7 @@ async function pickerSearch(){
 }
 function confirmLocationPicker(){
  const pk=state.picker;if(!pk?.point){toast('Selecciona primero un pin en el mapa.',true);return}
+ if(pk.validation?.status==='outside'){toast(pk.validation.message,true);updatePickerVerificationUI();return}
   const form=document.querySelector(pk.origin==='edit'?'form[data-form="save-predio"]':'form[data-form="create-predio"]');
  if(!form)return;
  const lat=form.querySelector('[name="lat"]'),lng=form.querySelector('[name="lng"]');

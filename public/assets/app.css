@@ -841,3 +841,7 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
 .veo-gmap-nav.prev{left:6px}.veo-gmap-nav.next{right:6px}
 .veo-gmap-count{position:absolute;right:8px;bottom:8px;padding:2px 7px;border-radius:10px;background:#000a;color:#fff;font-size:11px;font-weight:700;pointer-events:none}
 @media (hover:none){.veo-gmap-nav{display:none}} /* en celular se desliza con el dedo */
+
+/* Leyenda: pin fuera de la línea del corredor */
+.picker-corridor-alert{margin:10px 0 0;padding:10px 12px;border-radius:10px;background:#3a2410;border:1px solid #f5b85a;color:#ffd79a;font-size:13px;font-weight:600;line-height:1.35}
+.picker-corridor-alert[hidden]{display:none}
