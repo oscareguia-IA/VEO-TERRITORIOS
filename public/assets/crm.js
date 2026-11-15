@@ -299,7 +299,7 @@ async function initMap(){const el=document.getElementById('opportunities-map');i
 window.veoOpen=id=>openPredio(id);
 function setTileLayer(){if(state.map?.setMode)state.map.setMode('streets')}
 async function searchNode(id){const c=corridor(id);if(!c||!state.map)return;let view=CORRIDOR_FOCUS?.[id];if(view){state.map.flyTo([view[0],view[1]],view[2]);toast('Ubicación orientativa del corredor; no representa un predio.')}else toast('No se encontró el sector de referencia.',true)}
-let aforoZoomActual=200;
+let aforoZoomActual=100;
 function aforoEscala(pct,inicial=false){
   const lienzo=document.getElementById('aforo-lienzo');
   const imagen=document.getElementById('aforo-imagen');
@@ -327,7 +327,7 @@ function mostrarAforo(id){
       <div class="aforo-acciones">
         <div class="aforo-controles" role="group" aria-label="Escala de la ficha">
           <button type="button" class="aforo-control" data-action="aforo-minus" aria-label="Reducir tamaño">−</button>
-          <span id="aforo-nivel" class="aforo-porcentaje">200%</span>
+          <span id="aforo-nivel" class="aforo-porcentaje">100%</span>
           <button type="button" class="aforo-control" data-action="aforo-plus" aria-label="Ampliar tamaño">+</button>
           <button type="button" class="aforo-control aforo-ajustar" id="aforo-ajustar" data-action="aforo-fit" title="Ver ficha completa">AJUSTAR</button>
           <button type="button" class="aforo-control aforo-doble" data-action="aforo-double" title="Ver al doble de tamaño">2×</button>
@@ -346,7 +346,7 @@ function mostrarAforo(id){
   </section>`;
   const lienzo=document.getElementById('aforo-lienzo');
   const imagen=document.getElementById('aforo-imagen');
-  aforoEscala(200,true);
+  aforoEscala(100,true);
   imagen.addEventListener('load',()=>aforoEscala(aforoZoomActual,true),{once:true});
   let inicio=null;
   lienzo.addEventListener('pointerdown',(ev)=>{
