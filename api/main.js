@@ -53,7 +53,7 @@ async function predioFor(me,id){const p=await one('veo_predios',{id:`eq.${id}`})
 const cleanText=(v,max=2000)=>String(v??'').trim().slice(0,max);
 const validUsername=(str)=>/^[a-zA-Z0-9._-]{3,50}$/.test(str);
 const reqItems=(p,docs,to)=>{const found=t=>docs.some(x=>x.doc_type===t),items=[];const push=(label,done)=>items.push({key:label,label,done:!!done});
- if(to==='PRIMER_CONTACTO'){push('Broker asignado',p.broker_id);push('Ubicación y corredor verificados (pin GPS)',p.lat!=null&&p.lng!=null&&p.geo_status==='verificado');push('Fotografía del predio',found('foto'));push('Evidencia de mapa satelital',found('satelital'));push('Video con dron (archivo o enlace en expediente)',found('dron')||/^https?:\/\//.test(p.dron_url||''));push('Calificación ≥70/100',p.score>=70)}
+ if(to==='PRIMER_CONTACTO'){push('Broker asignado',p.broker_id);push('Ubicación registrada (pin GPS)',p.lat!=null&&p.lng!=null);push('Fotografía del predio',found('foto'));push('Evidencia de mapa satelital',found('satelital'));push('Video con dron (archivo o enlace en expediente)',found('dron')||/^https?:\/\//.test(p.dron_url||''));push('Calificación ≥70/100',p.score>=70)}
  if(to==='SEGUIMIENTO'){push('Nombre del dueño / administrador',p.propietario);push('Teléfono o correo de contacto',p.telefono||p.email);push('Fecha del primer contacto',p.fecha_contacto);push('Respuesta no descartada',['evaluando','interesado'].includes(p.interes))}
  if(to==='CIERRE'){push('Carta de intención presentada',found('carta_intencion'));push('Interés confirmado del propietario',p.interes==='interesado');push('Condición de permiso municipal explicada',p.clausula_condicional)}return items;
 };
@@ -115,6 +115,7 @@ const encodedPath=p=>p.split('/').map(encodeURIComponent).join('/');
 const signedLink=(data,path,kind)=>{const token=new URL(data.url||data.signedURL||'','https://supabase.invalid').searchParams.get('token');ensure(token,'No fue posible firmar el archivo.',502);return `${env().url}/storage/v1/object/${kind}/veo-documentos/${encodedPath(path)}?token=${encodeURIComponent(token)}`};
 async function validateGeo(id,point){
  const lat=+point.lat,lng=+point.lng;ensure(id>=1&&id<=14&&Number.isFinite(lat)&&Number.isFinite(lng),'Coordenadas inválidas.');
+ return {ok:true,status:'ok',message:'Ubicación registrada.'}; // verificación de corredor desactivada a petición del cliente (2026-11-15)
  if(lat<25.2||lat>26.3||lng< -101.4||lng> -99.5)return {ok:false,status:'outside',message:'Ubicación fuera del área metropolitana de estudio.'};
  const names={1:['paseo de los leones','paseo leones'],2:['garza sada'],3:['constitucion'],4:['lazaro cardenas'],5:['gonzalitos','eleuterio gonzalez'],6:['morones prieto'],7:['nogalar'],8:['miguel aleman'],9:['pablo livas'],10:['benito juarez'],11:['ruiz cortines'],12:['abraham lincoln'],13:['felix u gomez'],14:['madero']};
  const fold=x=>String(x||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
