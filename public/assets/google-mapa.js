@@ -71,7 +71,7 @@
 
     setMarkers(markers){
       for(const m of this.markerObjs)m.setMap(null);
-      this.markerObjs=[];this.closeInfo();
+      this.markerObjs=[];this.byPredio=new Map();this.closeInfo();
       if(this.destroyed)return;
       const gm=this.gm,hover=!window.matchMedia?.('(hover: none)').matches;
       for(const item of markers||[]){
@@ -86,6 +86,7 @@
           label:isPhoto?null:{text:String(item.name||'').slice(0,28),className:'veo-gmap-label',color:'#ffffff',fontSize:'12px',fontWeight:'700'}
         });
         const open=()=>{if(this.openKey===key)return;this.openKey=key;this.info.setContent(this.balloonHtml(item));this.info.open({map:this.map,anchor:marker})};
+        if(!isPhoto)this.byPredio.set(Number(item.id),open);
         if(hover)marker.addListener('mouseover',open);
         marker.addListener('click',open); // celular y laptop: el globo se abre; el expediente desde su botón
         this.markerObjs.push(marker);
@@ -93,6 +94,9 @@
     }
 
     closeInfo(){this.info?.close();this.openKey=null}
+
+    // Abre el globo de un predio (usado al tocarlo en la lista "Predios georreferenciados")
+    openMarker(id){const open=this.byPredio?.get(Number(id));if(!open)return false;this.openKey=null;this.el.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>{if(!this.destroyed)open()},450);return true}
 
     balloonHtml(item){
       const media=Array.isArray(item.media)?item.media:[];

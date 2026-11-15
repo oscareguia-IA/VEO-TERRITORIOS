@@ -653,13 +653,13 @@ async function action(target){const cmd=target.dataset.action,id=+target.dataset
   if(cmd==='revalidate-predio-geo'){const data=await api(`/api/predios/${id}/geo/revalidate`,{method:'POST',body:'{}'});await refresh(true);toast(data.geo_status==='verificado'?'Corredor verificado.':data.geo_status==='fuera_corredor'?'La ubicación no corresponde al corredor seleccionado.':'El predio sigue guardado con validación pendiente.',data.geo_status==='fuera_corredor');return}
   if(cmd==='open-predio'){await openPredio(id);return}
   if(cmd==='show-corridor'){state.selectedCorridor=id;state.view='mapa';state.mapProvider='veo';render();window.scrollTo(0,0);return}
-  if(cmd==='locate-opportunity'){const p=state.data.predios.find(x=>x.id===id);if(!p||p.lat==null||p.lng==null){toast('Este predio aún no tiene coordenadas.',true);return}if(state.mapProvider!=='veo'){state.mapProvider='veo';render();setTimeout(()=>state.map?.flyTo([+p.lat,+p.lng],17),140)}else state.map?.flyTo([+p.lat,+p.lng],17);await openPredio(id);return}
+  if(cmd==='locate-opportunity'){const p=state.data.predios.find(x=>x.id===id);if(!p||p.lat==null||p.lng==null){toast('Este predio aún no tiene coordenadas.',true);return}if(state.mapProvider!=='veo'){state.mapProvider='veo';render();setTimeout(()=>state.map?.flyTo([+p.lat,+p.lng],17),140)}else state.map?.flyTo([+p.lat,+p.lng],17);if(state.map?.openMarker?.(id))return;await openPredio(id);return}
   if(cmd==='metro-overview'){state.selectedCorridor=0;state.phaseFilter='';state.brokerFilter='';state.search='';state.view='mapa';render();return}
   if(cmd==='clear-filters'){state.search='';state.selectedCorridor=0;state.brokerFilter='';state.phaseFilter='';render();return}
   if(cmd==='aforo-minus'){aforoEscala(aforoZoomActual-25);return} if(cmd==='aforo-plus'){aforoEscala(aforoZoomActual+25);return} if(cmd==='aforo-fit'){aforoEscala(100);return} if(cmd==='aforo-double'){aforoEscala(200);return} if(cmd==='open-sheet'){showSheet(id);return}
   if(cmd==='search-node'){await searchNode(id);return}
   if(cmd==='drawer-tab'){state.drawerTab=target.dataset.tab;drawDetail();return}
-  if(cmd==='focus-property'){let p=state.data.predios.find(x=>x.id===id);if(p){state.mapProvider='veo';state.selectedCorridor=p.corridor_id;state.phaseFilter='';state.brokerFilter='';state.view='mapa';closeDrawer();render();setTimeout(()=>state.map?.flyTo([+p.lat,+p.lng],16),150)}return}
+  if(cmd==='focus-property'){let p=state.data.predios.find(x=>x.id===id);if(p){state.mapProvider='veo';state.selectedCorridor=p.corridor_id;state.phaseFilter='';state.brokerFilter='';state.view='mapa';closeDrawer();render();setTimeout(()=>{state.map?.flyTo([+p.lat,+p.lng],16);state.map?.openMarker?.(p.id)},150)}return}
   if(cmd==='my-password'){showOwnPasswordForm();return}
   if(cmd==='deactivate-broker'){
    if(!isAdmin())throw Error('Sólo el Administrador puede dar de baja a un broker');
