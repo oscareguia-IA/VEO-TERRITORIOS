@@ -1,6 +1,6 @@
 module.exports=async(req,res)=>{
 res.setHeader('Cache-Control','no-store');
-const expected='https://zpreaergmuhqdzoolzco.supabase.co';
+const expected='https://irmxdihpftqdcegoptmn.supabase.co';
 const url=(process.env.SUPABASE_URL||'').replace(/\/$/,'');
 const key=(process.env.SUPABASE_SECRET_KEY||'').trim();
 const alphabet=/^[A-Za-z0-9_-]+$/;
