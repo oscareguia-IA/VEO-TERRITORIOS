@@ -66,6 +66,9 @@ async function rpc(fn,args){try{return await rest('rpc/'+fn,{method:'POST',data:
 function tooMany(res,secs){res.setHeader('Retry-After',String(secs));return codeError(429,`Demasiados intentos fallidos. Espera ${Math.ceil(secs/60)} minutos e inténtalo de nuevo.`)}
 // ── Georreferencia de fotografías ──
 const IMAGE_EXT=/\.(jpe?g|png|webp|heic|heif)$/i;
+const DISPLAY_EXT=/\.(jpe?g|png|webp)$/i;
+const isDisplayPhoto=d=>d.doc_type==='foto'&&DISPLAY_EXT.test(String(d.original_filename||d.storage_path||''));
+function coverIds(documents){const m={};for(const d of documents)if(isDisplayPhoto(d)&&(!m[d.predio_id]||d.id>m[d.predio_id]))m[d.predio_id]=d.id;return m}
 function docGeo(b){
  const isPhoto=b.doc_type==='foto'&&IMAGE_EXT.test(String(b.original_filename||b.storage_path||''));
  if(b.geo_lat===undefined||b.geo_lat===null||b.geo_lat===''){ensure(!isPhoto,'La fotografía del predio debe estar georreferenciada (GPS de la foto o ubicación del dispositivo).');return{}}
@@ -143,7 +146,8 @@ async function handle(req,res){
   if(me.must_change_password)return result;
   const [users,ps,documents,requests,activity]=await Promise.all([list('veo_users',{order:'id.asc'}),list('veo_predios',{order:'updated_at.desc',limit:3000}),list('veo_documents',{limit:10000}),list('veo_requests',{order:'created_at.desc',limit:1000}),list('veo_activity',{order:'created_at.desc',limit:50})]);
   const visible=ps.filter(p=>p.active&&canSee(me,p));const ids=new Set(visible.map(p=>p.id));const names=Object.fromEntries(users.map(x=>[x.id,x.display_name]));
-  return {...result,maps_js_key:String(process.env.VEO_GOOGLE_MAPS_KEY||'').trim(),users:(mayManage(me)?users:users.filter(x=>x.active&&x.role==='broker')).map(safeUser),predios:visible.map(p=>({...p,broker_name:names[p.broker_id]||'Sin asignar',docs_count:documents.filter(d=>d.predio_id===p.id).length,pending_count:requests.filter(r=>r.predio_id===p.id&&r.status==='pendiente').length})),requests:requests.filter(r=>ids.has(r.predio_id)),photos:documents.filter(d=>ids.has(d.predio_id)&&d.geo_lat!=null&&d.geo_lng!=null).map(d=>({id:d.id,predio_id:d.predio_id,lat:d.geo_lat,lng:d.geo_lng,source:d.geo_source,filename:d.original_filename,taken_at:d.taken_at||d.created_at})),activity:activity.filter(a=>a.predio_id==null||ids.has(a.predio_id)),corridors:null,weights:WEIGHTS};
+  const covers=coverIds(documents);
+  return {...result,maps_js_key:String(process.env.VEO_GOOGLE_MAPS_KEY||'').trim(),users:(mayManage(me)?users:users.filter(x=>x.active&&x.role==='broker')).map(safeUser),predios:visible.map(p=>({...p,broker_name:names[p.broker_id]||'Sin asignar',docs_count:documents.filter(d=>d.predio_id===p.id).length,cover_doc_id:covers[p.id]||null,pending_count:requests.filter(r=>r.predio_id===p.id&&r.status==='pendiente').length})),requests:requests.filter(r=>ids.has(r.predio_id)),photos:documents.filter(d=>ids.has(d.predio_id)&&d.geo_lat!=null&&d.geo_lng!=null).map(d=>({id:d.id,predio_id:d.predio_id,lat:d.geo_lat,lng:d.geo_lng,source:d.geo_source,filename:d.original_filename,img:isDisplayPhoto(d),taken_at:d.taken_at||d.created_at})),activity:activity.filter(a=>a.predio_id==null||ids.has(a.predio_id)),corridors:null,weights:WEIGHTS};
  }
  ensure(!me.must_change_password,'Debes cambiar la contraseña temporal antes de continuar.',403);
  if(key==='users'&&method==='POST'){

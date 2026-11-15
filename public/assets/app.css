@@ -825,3 +825,7 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
 .veo-gmap-info a,.veo-gmap-info button{display:block;text-align:center;padding:8px 10px;border-radius:8px;font-weight:700;font-size:12px;text-decoration:none;cursor:pointer;border:0}
 .veo-gmap-info a{background:#1a73e8;color:#fff}
 .veo-gmap-info button{background:#fa3b74;color:#fff}
+
+.veo-gmap-info{width:230px}
+.veo-gmap-info a.veo-gmap-photo{padding:0;background:#e8edf3;border-radius:10px;overflow:hidden;display:block}
+.veo-gmap-photo img{width:100%;height:140px;object-fit:cover;display:block}

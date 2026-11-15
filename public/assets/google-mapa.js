@@ -74,7 +74,7 @@
             :{url:pinSvg(item.color||'#fa3b74'),scaledSize:new gm.Size(30,39),anchor:new gm.Point(15,38),labelOrigin:new gm.Point(15,-10)},
           label:isPhoto?null:{text:String(item.name||'').slice(0,28),className:'veo-gmap-label',color:'#ffffff',fontSize:'12px',fontWeight:'700'}
         });
-        const html=`<div class="veo-gmap-info"><strong>${esc(item.name||'Predio VEO')}</strong><small>${esc(item.code||'')}</small>`+
+        const html=`<div class="veo-gmap-info">`+(item.photoUrl?`<a class="veo-gmap-photo" href="${esc(item.photoUrl)}" target="_blank" rel="noopener" title="Ver foto completa"><img src="${esc(item.photoUrl)}" alt="Foto del predio" loading="lazy" onerror="this.parentNode.remove()"></a>`:'')+`<strong>${esc(item.name||'Predio VEO')}</strong><small>${esc(item.code||'')}</small>`+
           (item.googleUrl?`<a href="${esc(item.googleUrl)}" target="_blank" rel="noopener noreferrer">↗ Ver en Google Maps</a>`:'')+
           `<button type="button" data-veo-open="${esc(item.id)}">Abrir expediente</button></div>`;
         marker.addListener('mouseover',()=>{this.info.setContent(html);this.info.open({map:this.map,anchor:marker})});
