@@ -873,3 +873,16 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
  .dash .metric-grid>*{flex-basis:140px}
  .dash-actions .btn{flex-basis:140px;white-space:normal}
 }
+
+/* ── Botón de cerrar (×) más grande y en rojo, en modales, expedientes, buscador y mapa ── */
+.icon-btn[data-action="close-modal"],.icon-btn[data-action="close-drawer"],
+.icon-btn[data-action="close-command"],.icon-btn[data-action="picker-cancel"]{
+ width:52px;height:52px;min-width:52px;min-height:52px;border-radius:14px;
+ background:#e5484d;border:1px solid #ff7b7f;color:#fff;font-size:30px;font-weight:700;line-height:1;
+ box-shadow:0 6px 18px #e5484d55;transition:background .15s,transform .15s}
+.icon-btn[data-action="close-modal"]:hover,.icon-btn[data-action="close-drawer"]:hover,
+.icon-btn[data-action="close-command"]:hover,.icon-btn[data-action="picker-cancel"]:hover{background:#ff5a5f;transform:scale(1.05)}
+.icon-btn[data-action="close-modal"]:focus-visible,.icon-btn[data-action="close-drawer"]:focus-visible,
+.icon-btn[data-action="close-command"]:focus-visible,.icon-btn[data-action="picker-cancel"]:focus-visible{outline:3px solid #ffd2d3;outline-offset:2px}
+
+.vista-oculta{display:none!important}

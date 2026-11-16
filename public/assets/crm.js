@@ -169,6 +169,9 @@ function render(){
  closeMap();renderNav();
  const views={dashboard:renderDashboard,mapa:renderMap,pipeline:renderPipeline,predios:renderPredios,aprobaciones:renderApprovals,brokers:renderBrokers,fuentes:renderSources,config:renderConfig,credenciales:renderCredentials};
  root.innerHTML=(views[state.view]||renderDashboard)();
+ // «Registrar predio» sólo en Inicio, Mapa de oportunidades y Pipeline
+ const vista=views[state.view]?state.view:'dashboard';
+ document.querySelectorAll('.top-actions [data-action="new-predio"]').forEach(b=>b.classList.toggle('vista-oculta',!['dashboard','mapa','pipeline'].includes(vista)));
  root.classList.toggle('map-fullwidth',state.view==='mapa');
  root.classList.remove('view-animate');void root.offsetWidth;root.classList.add('view-animate');
  hydrateGoogleMaps();
