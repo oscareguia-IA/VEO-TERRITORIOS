@@ -63,6 +63,15 @@ const LOGIN_USER_MAX=5, LOGIN_IP_MAX=20, LOGIN_WINDOW_S=900, LOGIN_LOCK_S=900;
 const DUMMY_HASH='scrypt$00000000000000000000000000000000000000$'+'0'.repeat(128);
 const clientIp=req=>String(req?.headers?.['x-real-ip']||String(req?.headers?.['x-forwarded-for']||'').split(',')[0]||'desconocida').trim().slice(0,64);
 async function rpc(fn,args){try{return await rest('rpc/'+fn,{method:'POST',data:args})}catch(e){console.error('VEO_RATE_LIMIT',fn,e.message);return null}}
+// Límite de escrituras por usuario. Reutiliza el contador atómico de veo_login_attempts
+// (veo_login_check/veo_login_fail) con otras llaves; si la base falla, no bloquea (fail-open).
+const WRITE_LIMITS={escritura:{max:120,window:60,lock:60},subida:{max:60,window:600,lock:300}};
+async function writeLimit(me,key,res){
+ const kind=/\/documents\/sign$/.test(key)?'subida':'escritura',L=WRITE_LIMITS[kind],k=`${kind}:${me.id}`;
+ const [wait,locked]=await Promise.all([rpc('veo_login_check',{p_keys:[k]}),rpc('veo_login_fail',{p_key:k,p_max:L.max,p_window_s:L.window,p_lock_s:L.lock})]);
+ const secs=Math.max(Number(wait)||0,Number(locked)||0);
+ if(secs>0){res.setHeader('Retry-After',String(secs));throw codeError(429,kind==='subida'?'Demasiados archivos en poco tiempo. Espera unos minutos.':'Demasiadas operaciones seguidas. Espera un momento.')}
+}
 function tooMany(res,secs){res.setHeader('Retry-After',String(secs));return codeError(429,`Demasiados intentos fallidos. Espera ${Math.ceil(secs/60)} minutos e inténtalo de nuevo.`)}
 // ── Georreferencia de fotografías ──
 const IMAGE_EXT=/\.(jpe?g|png|webp|heic|heif)$/i;
@@ -126,6 +135,7 @@ async function handle(req,res){
  if(key==='login'&&method==='POST')return login(req.body||{},res,req);
  const {u:me,csrf}=await session(req,res);
  if(method!=='GET')ensure(req.headers['x-csrf-token']===csrf,'Token de seguridad inválido. Recarga la aplicación.',403);
+ if(method!=='GET')await writeLimit(me,key,res);
  const b=req.body||{};
  if(key==='logout'&&method==='POST'){clearSession(res);return {ok:true}}
  if(key==='me/password'&&method==='POST'){
@@ -136,10 +146,14 @@ async function handle(req,res){
  if(key==='bootstrap'&&method==='GET'){
   const result={user:safeUser(me),csrf,must_change_password:me.must_change_password};
   if(me.must_change_password)return result;
-  const [users,ps,documents,requests,activity]=await Promise.all([list('veo_users',{order:'id.asc'}),list('veo_predios',{order:'updated_at.desc',limit:3000}),list('veo_documents',{limit:10000}),list('veo_requests',{order:'created_at.desc',limit:1000}),list('veo_activity',{order:'created_at.desc',limit:50})]);
+  // Brokers: la base filtra sus predios; canSee() se mantiene como segunda barrera.
+  const predioQuery={active:'eq.true',order:'updated_at.desc',limit:3000};if(me.role==='broker')predioQuery.or=`(broker_id.eq.${+me.id},created_by.eq.${+me.id})`;
+  const docCols='id,predio_id,doc_type,storage_path,original_filename,uploaded_by_name,created_at,geo_lat,geo_lng,geo_source,taken_at';
+  const [users,ps,documents,requests,activity]=await Promise.all([list('veo_users',{order:'id.asc'}),list('veo_predios',predioQuery),list('veo_documents',{select:docCols,limit:10000}),list('veo_requests',{order:'created_at.desc',limit:1000}),list('veo_activity',{order:'created_at.desc',limit:50})]);
   const visible=ps.filter(p=>p.active&&canSee(me,p));const ids=new Set(visible.map(p=>p.id));const names=Object.fromEntries(users.map(x=>[x.id,x.display_name]));
   const media=mediaByPredio(documents);
-  return {...result,maps_js_key:String(process.env.VEO_GOOGLE_MAPS_KEY||'').trim(),users:(mayManage(me)?users:users.filter(x=>x.active&&x.role==='broker')).map(safeUser),predios:visible.map(p=>({...p,broker_name:names[p.broker_id]||'Sin asignar',docs_count:documents.filter(d=>d.predio_id===p.id).length,media:media[p.id]||[],pending_count:requests.filter(r=>r.predio_id===p.id&&r.status==='pendiente').length})),requests:requests.filter(r=>ids.has(r.predio_id)),photos:documents.filter(d=>ids.has(d.predio_id)&&d.geo_lat!=null&&d.geo_lng!=null).map(d=>({id:d.id,predio_id:d.predio_id,lat:d.geo_lat,lng:d.geo_lng,source:d.geo_source,filename:d.original_filename,media:mediaKind(d)?[mediaItem(d)]:[],taken_at:d.taken_at||d.created_at})),activity:activity.filter(a=>a.predio_id==null||ids.has(a.predio_id)),corridors:null,weights:WEIGHTS};
+  const docsCount=new Map(),pendingCount=new Map();for(const d of documents)docsCount.set(d.predio_id,(docsCount.get(d.predio_id)||0)+1);for(const r of requests)if(r.status==='pendiente')pendingCount.set(r.predio_id,(pendingCount.get(r.predio_id)||0)+1);
+  return {...result,maps_js_key:String(process.env.VEO_GOOGLE_MAPS_KEY||'').trim(),users:(mayManage(me)?users:users.filter(x=>x.active&&x.role==='broker')).map(safeUser),predios:visible.map(p=>({...p,broker_name:names[p.broker_id]||'Sin asignar',docs_count:docsCount.get(p.id)||0,media:media[p.id]||[],pending_count:pendingCount.get(p.id)||0})),requests:requests.filter(r=>ids.has(r.predio_id)),photos:documents.filter(d=>ids.has(d.predio_id)&&d.geo_lat!=null&&d.geo_lng!=null).map(d=>({id:d.id,predio_id:d.predio_id,lat:d.geo_lat,lng:d.geo_lng,source:d.geo_source,filename:d.original_filename,media:mediaKind(d)?[mediaItem(d)]:[],taken_at:d.taken_at||d.created_at})),activity:activity.filter(a=>a.predio_id==null||ids.has(a.predio_id)),corridors:null,weights:WEIGHTS};
  }
  ensure(!me.must_change_password,'Debes cambiar la contraseña temporal antes de continuar.',403);
  if(key==='users'&&method==='POST'){
