@@ -6,6 +6,10 @@
 const crypto=require('node:crypto');
 const { promisify }=require('node:util');
 const scrypt=promisify(crypto.scrypt);
+// Monitoreo de errores: sólo se activa si existe SENTRY_DSN (Vercel). Sin cookies, cuerpos ni datos personales.
+let Sentry=null;
+if(process.env.SENTRY_DSN){try{Sentry=require('@sentry/node');Sentry.init({dsn:process.env.SENTRY_DSN.trim(),environment:process.env.VERCEL_ENV||'local',release:process.env.VERCEL_GIT_COMMIT_SHA,sendDefaultPii:false,tracesSampleRate:0,
+ beforeSend(ev){if(ev.request){delete ev.request.cookies;delete ev.request.data;if(ev.request.headers){for(const h of ['cookie','x-csrf-token','authorization'])delete ev.request.headers[h]}}if(ev.user)ev.user={id:ev.user.id};return ev}})}catch(e){console.error('Sentry init',e.message);Sentry=null}}
 const PHASES=['BUSQUEDA_FACTIBILIDAD','PRIMER_CONTACTO','SEGUIMIENTO','CIERRE'];
 const WEIGHTS={flujo:30,visibilidad:25,urbana:15,electrica:10,propietario:10,comercial:10};
 const DOC_TYPES=new Set(['foto','satelital','dron','carta_intencion','contrato','mecanica_suelos','memoria_calculo','factibilidad_electrica','permiso_municipal','otro']);
@@ -243,6 +247,6 @@ async function handle(req,res){
  }
  throw codeError(404,'Ruta de API no encontrada.');
 }
-module.exports=async function(req,res){try{const data=await handle(req,res);if(!res.writableEnded)send(res,200,data===undefined?{ok:true}:data)}catch(e){const status=e.status||500;if(status>=500)console.error('VEO API',status,e.message);if(!res.writableEnded)send(res,status,{detail:e.status?e.message:'Error interno del servidor.'})}};
+module.exports=async function(req,res){try{const data=await handle(req,res);if(!res.writableEnded)send(res,200,data===undefined?{ok:true}:data)}catch(e){const status=e.status||500;if(status>=500){console.error('VEO API',status,e.message);if(Sentry){Sentry.withScope(s=>{s.setTag('route',String(req.query?.route||''));s.setTag('method',req.method||'');s.setTag('status',String(status));Sentry.captureException(e)});await Sentry.flush(2000).catch(()=>{})}}if(!res.writableEnded)send(res,status,{detail:e.status?e.message:'Error interno del servidor.'})}};
 // Sólo para tests locales, no expone ninguna ruta adicional de servicio.
 module.exports._internal={handle,hashPassword,checkPassword,signedSession,decodeSession};
