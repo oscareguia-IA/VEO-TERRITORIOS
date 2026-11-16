@@ -144,7 +144,7 @@ async function handle(req,res){
  const b=req.body||{};
  if(key==='logout'&&method==='POST'){clearSession(res);return {ok:true}}
  if(key==='me/password'&&method==='POST'){
-  ensure(await checkPassword(b.current_password,me.password_hash),'La contraseña actual no coincide.');ensure(typeof b.new_password==='string'&&b.new_password.length>=10&&b.new_password.length<=128,'Contraseña nueva: entre 10 y 128 caracteres.');ensure(b.new_password!==b.current_password,'La nueva contraseña debe ser diferente.');
+  ensure(await checkPassword(b.current_password,me.password_hash),'La contraseña actual no coincide.');ensure(typeof b.new_password==='string'&&b.new_password.length>=7&&b.new_password.length<=128,'Contraseña nueva: entre 7 y 128 caracteres.');ensure(b.new_password!==b.current_password,'La nueva contraseña debe ser diferente.');
   await patch('veo_users',me.id,{password_hash:await hashPassword(b.new_password),must_change_password:false,password_changed_at:new Date().toISOString(),credential_updated_at:new Date().toISOString(),session_version:me.session_version+1});
   const updated=await one('veo_users',{id:`eq.${me.id}`});setSession(res,updated);await audit(me,null,'credenciales',`Cambió contraseña de ${me.username}`);return {ok:true};
  }
@@ -163,7 +163,7 @@ async function handle(req,res){
  ensure(!me.must_change_password,'Debes cambiar la contraseña temporal antes de continuar.',403);
  if(key==='users'&&method==='POST'){
   ensure(me.role==='admin','Sólo el administrador gestiona credenciales.',403);
-  const username=cleanText(b.username,50).toLowerCase(),password=String(b.password||''),role=b.role||'broker';ensure(validUsername(username),'El usuario debe tener 3-50 caracteres (letras, números, punto, guion o _).');ensure(password.length>=10&&password.length<=128,'La contraseña temporal debe tener entre 10 y 128 caracteres.');ensure(ROLES.has(role),'Rol no válido.');
+  const username=cleanText(b.username,50).toLowerCase(),password=String(b.password||''),role=b.role||'broker';ensure(validUsername(username),'El usuario debe tener 3-50 caracteres (letras, números, punto, guion o _).');ensure(password.length>=7&&password.length<=128,'La contraseña temporal debe tener entre 7 y 128 caracteres.');ensure(ROLES.has(role),'Rol no válido.');
   const user=await add('veo_users',{username,display_name:cleanText(b.display_name,120)||username,role,active:true,must_change_password:true,password_hash:await hashPassword(password)});await audit(me,null,'credenciales',`Creó cuenta ${user.username}`);return {ok:true,id:user.id};
  }
  if(parts[0]==='users'&&parts[1]&&['PATCH','DELETE'].includes(method)){
@@ -171,7 +171,7 @@ async function handle(req,res){
   if(method==='DELETE'){ensure(target.role==='broker','La baja sólo se aplica a brokers.');ensure(target.id!==me.id,'No puedes darte de baja.');await patch('veo_users',target.id,{active:false,session_version:target.session_version+1});await audit(me,null,'credenciales',`Baja de broker ${target.username}`);const assoc=await list('veo_predios',{select:'id',broker_id:`eq.${target.id}`});return{ok:true,predios_preservados:assoc.length}}
   ensure(ROLES.has(b.role??target.role),'Rol no válido.');const update={display_name:cleanText(b.display_name??target.display_name,120),role:b.role??target.role,active:b.active!==undefined?!!b.active:target.active};
   if(target.id===me.id)ensure(update.active&&update.role==='admin'&&!b.password,'Utiliza Mi contraseña; no puedes retirar tu propio acceso.');
-  if(b.password){ensure(String(b.password).length>=10&&String(b.password).length<=128,'Contraseña temporal entre 10 y 128 caracteres.');update.password_hash=await hashPassword(b.password);update.must_change_password=true;update.credential_updated_at=new Date().toISOString()}
+  if(b.password){ensure(String(b.password).length>=7&&String(b.password).length<=128,'Contraseña temporal entre 7 y 128 caracteres.');update.password_hash=await hashPassword(b.password);update.must_change_password=true;update.credential_updated_at=new Date().toISOString()}
   update.session_version=target.session_version+1;await patch('veo_users',target.id,update);await audit(me,null,'credenciales',`Actualizó cuenta ${target.username}`);
   if(target.id===me.id){const refreshed=await one('veo_users',{id:`eq.${me.id}`});setSession(res,refreshed)}return{ok:true};
  }
