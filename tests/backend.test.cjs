@@ -178,6 +178,15 @@ test('nuevo predio no se marca como verificado y ya no existe la revalidación',
   assert.equal((await call('POST', 'predios/1/geo/revalidate', { cookie, csrf, body: {} })).status, 404);
 });
 
+test('contraseñas: se aceptan desde 7 caracteres y se rechazan con 6', async () => {
+  await addUser('ana', 'admin');
+  const a = await loginAs('ana');
+  assert.equal((await call('POST', 'users', { ...a, body: { username: 'corta', password: '123456' } })).status, 400);
+  assert.equal((await call('POST', 'users', { ...a, body: { username: 'siete', password: '1234567' } })).status, 200);
+  const r = await call('POST', 'me/password', { ...a, body: { current_password: 'clave-segura-123', new_password: 'abc1234' } });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+});
+
 test('sólo admin crea usuarios; broker no exporta CSV', async () => {
   await addUser('ana', 'admin'); await addUser('beto', 'broker');
   const b = await loginAs('beto');
