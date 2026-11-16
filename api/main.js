@@ -115,19 +115,7 @@ const encodedPath=p=>p.split('/').map(encodeURIComponent).join('/');
 const signedLink=(data,path,kind)=>{const token=new URL(data.url||data.signedURL||'','https://supabase.invalid').searchParams.get('token');ensure(token,'No fue posible firmar el archivo.',502);return `${env().url}/storage/v1/object/${kind}/veo-documentos/${encodedPath(path)}?token=${encodeURIComponent(token)}`};
 async function validateGeo(id,point){
  const lat=+point.lat,lng=+point.lng;ensure(id>=1&&id<=14&&Number.isFinite(lat)&&Number.isFinite(lng),'Coordenadas inválidas.');
- return {ok:true,status:'ok',message:'Ubicación registrada.'}; // verificación de corredor desactivada a petición del cliente (2026-11-15)
- if(lat<25.2||lat>26.3||lng< -101.4||lng> -99.5)return {ok:false,status:'outside',message:'Ubicación fuera del área metropolitana de estudio.'};
- const names={1:['paseo de los leones','paseo leones'],2:['garza sada'],3:['constitucion'],4:['lazaro cardenas'],5:['gonzalitos','eleuterio gonzalez'],6:['morones prieto'],7:['nogalar'],8:['miguel aleman'],9:['pablo livas'],10:['benito juarez'],11:['ruiz cortines'],12:['abraham lincoln'],13:['felix u gomez'],14:['madero']};
- const fold=x=>String(x||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
- const q=`[out:json][timeout:9];way(around:350,${lat.toFixed(7)},${lng.toFixed(7)})["highway"]["name"];out tags geom;`;
- try{
-  const r=await fetch('https://overpass-api.de/api/interpreter?data='+encodeURIComponent(q),{headers:{Accept:'application/json'},signal:AbortSignal.timeout(8500)});ensure(r.ok,'Servicio geográfico no disponible.',503);const data=await r.json();let min=Infinity,nm='';
-  const segment=(a,b)=>{const sx=111320*Math.cos(lat*Math.PI/180),sy=111195,px=lng*sx,py=lat*sy,ax=a.lon*sx,ay=a.lat*sy,bx=b.lon*sx,by=b.lat*sy,dx=bx-ax,dy=by-ay,t=dx*dx+dy*dy?Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/(dx*dx+dy*dy))):0;return Math.hypot(px-(ax+t*dx),py-(ay+t*dy))};
-  for(const w of data.elements||[]){const vals=['name','name:es','alt_name','official_name','short_name','loc_name'].map(k=>fold(w.tags?.[k]));if(!vals.some(x=>names[id]?.some(n=>x.includes(n)))||!w.geometry?.length)continue;
-   const geom=w.geometry;for(let j=1;j<geom.length;j++){const d=segment(geom[j-1],geom[j]);if(d<min){min=d;nm=w.tags?.name||''}}}
-  if(!Number.isFinite(min))return{ok:false,status:'unavailable',message:'No se identificó cartografía suficiente. La ubicación queda pendiente.'};
-  return min<=100?{ok:true,status:'validated',distance_m:+min.toFixed(1),street:nm,message:`Pin a ${Math.round(min)} m del corredor.`}:{ok:false,status:'outside',distance_m:+min.toFixed(1),message:'Fuera del radio de 100 m del corredor seleccionado.'};
- }catch(e){return{ok:false,status:'unavailable',message:'Servicio cartográfico temporalmente inaccesible; el predio quedará pendiente.'}}
+ return {ok:true,status:'ok',message:'Ubicación registrada.'}; // verificación de corredor (Overpass) desactivada a petición del cliente 2026-11-15; versión anterior en el historial git
 }
 async function handle(req,res){
  res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');
@@ -172,7 +160,7 @@ async function handle(req,res){
   ensure(mayManage(me),'Sólo supervisión puede exportar predios.',403);
   const [ps,users]=await Promise.all([list('veo_predios',{limit:5000}),list('veo_users')]);const names=Object.fromEntries(users.map(u=>[u.id,u.display_name]));
   const cols=['id','code','alias','corridor_id','municipio','direccion','lat','lng','phase','score','broker_id','broker_name','propietario','telefono','email','active','created_at'];
-  const csv=[cols.join(','),...ps.map(p=>cols.map(k=>{const value=k==='broker_name'?names[p.broker_id]||'':p[k]??'';return '"'+String(value).replaceAll('"','""')+'"'}).join(','))].join('\r\n');
+  const csv=[cols.join(','),...ps.map(p=>cols.map(k=>{const value=k==='broker_name'?names[p.broker_id]||'':p[k]??'';let t=String(value);if(/^[=+\-@\t\r]/.test(t))t="'"+t;return '"'+t.replaceAll('"','""')+'"'}).join(','))].join('\r\n');
   res.statusCode=200;res.setHeader('Content-Type','text/csv; charset=utf-8');res.setHeader('Content-Disposition','attachment; filename="veo-territorios-predios.csv"');res.end('\uFEFF'+csv);return null;
  }
  if(key==='archives'&&method==='GET'){ensure(mayManage(me),'Sólo supervisión puede consultar archivos.',403);const [ps,users]=await Promise.all([list('veo_predios',{active:'eq.false',limit:2000}),list('veo_users')]);const names=Object.fromEntries(users.map(x=>[x.id,x.display_name]));return {predios:ps.map(p=>({...p,broker_name:names[p.broker_id]||'—'}))}}
