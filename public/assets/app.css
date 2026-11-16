@@ -847,3 +847,29 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
 /* Leyenda: pin fuera de la línea del corredor */
 .picker-corridor-alert{margin:10px 0 0;padding:10px 12px;border-radius:10px;background:#3a2410;border:1px solid #f5b85a;color:#ffd79a;font-size:13px;font-weight:600;line-height:1.35}
 .picker-corridor-alert[hidden]{display:none}
+
+/* ── Centro de control compacto (nov. 2026): sin huecos, filas que se reacomodan solas ── */
+.dash .hero{min-height:0;padding-block:26px}
+.dash .hero p{margin-bottom:0}
+.dash .hero .btn{white-space:nowrap;flex-direction:row;padding:11px 16px;min-height:0;height:auto;width:auto}
+.dash .btn svg{width:17px;height:17px;flex:0 0 17px}
+.dash .quickflow,.dash .metric-grid{display:flex;flex-wrap:wrap;gap:12px;margin:14px 0 0}
+.dash .quickflow>*{flex:1 1 120px;min-width:0}
+.dash .metric-grid>*{flex:1 1 120px;min-width:0;grid-column:auto}
+.dash .metric-grid .metric:last-child{grid-column:auto}
+.dash-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:14px;align-items:stretch}
+.dash-row .panel{display:flex;flex-direction:column;min-width:0}
+.dash-row .panel-content{flex:1}
+.dash-pending{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;padding:11px 13px;border:1px solid #345069;border-radius:12px;background:#1a3045}
+.dash-pending small{display:block;color:#8fa9bf;font-size:9px;font-weight:800;letter-spacing:.9px}
+.dash-pending b{font-size:22px;line-height:1.2}
+.dash-pending .btn{white-space:nowrap;width:auto;flex:none}
+.dash-note{margin:12px 0 0;color:#e8c58f;font-size:11px;line-height:1.5}
+.dash-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.dash-actions .btn{flex:1 1 160px;white-space:nowrap;width:auto;min-height:44px;flex-direction:row}
+@media(max-width:1000px){.dash-row{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:700px){
+ .dash .quickflow>*{flex-basis:140px}
+ .dash .metric-grid>*{flex-basis:140px}
+ .dash-actions .btn{flex-basis:140px;white-space:normal}
+}
