@@ -905,3 +905,14 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
 @keyframes dashPulse{0%{box-shadow:0 0 0 0 #fffa}70%{box-shadow:0 0 0 9px #fff0}100%{box-shadow:0 0 0 0 #fff0}}
 @media(prefers-reduced-motion:reduce){.dash-approvals-dot{animation:none}}
 @media(max-width:700px){.dash-approvals-alert{flex-wrap:wrap;font-size:13px}.dash-approvals-sub{margin-left:0;width:100%}}
+
+/* Instalar como app (PWA) */
+.install-strip{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:11px 14px;border:1px solid #2f9c78;border-radius:14px;background:linear-gradient(115deg,#123f35,#10302b)}
+.install-strip-ico{font-size:22px;flex:none}
+.install-strip b{display:block;font-size:13px;color:#eafff6}
+.install-strip small{display:block;font-size:11px;color:#a9d8c6;margin-top:2px}
+.install-strip .btn{margin-left:auto;flex:none;white-space:nowrap;width:auto}
+.install-strip-close{flex:none;width:34px;height:34px;border-radius:10px;border:1px solid #3c6f60;background:transparent;color:#cfeee2;font-size:20px;line-height:1;cursor:pointer}
+.install-modal{max-width:520px;width:100%}
+.install-steps{margin:14px 0 0;padding-left:22px;display:grid;gap:12px;font-size:14px;line-height:1.5;color:#dbe9f5}
+@media(max-width:700px){.install-strip{flex-wrap:wrap}.install-strip .btn{margin-left:0}}
