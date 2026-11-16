@@ -12,7 +12,7 @@ if(process.env.SENTRY_DSN){try{Sentry=require('@sentry/node');Sentry.init({dsn:p
  beforeSend(ev){if(ev.request){delete ev.request.cookies;delete ev.request.data;if(ev.request.headers){for(const h of ['cookie','x-csrf-token','authorization'])delete ev.request.headers[h]}}if(ev.user)ev.user={id:ev.user.id};return ev}})}catch(e){console.error('Sentry init',e.message);Sentry=null}}
 const PHASES=['BUSQUEDA_FACTIBILIDAD','PRIMER_CONTACTO','SEGUIMIENTO','CIERRE','EN_OPERACION'];
 const LAST_PHASE=PHASES[PHASES.length-1];
-const WEIGHTS={flujo:30,visibilidad:25,urbana:15,electrica:10,propietario:10,comercial:10};
+const WEIGHTS={flujo:45,visibilidad:25,electrica:10,propietario:10,comercial:10};
 const DOC_TYPES=new Set(['foto','satelital','dron','carta_intencion','contrato','mecanica_suelos','memoria_calculo','factibilidad_electrica','permiso_municipal','operacion','otro']);
 const ROLES=new Set(['admin','supervisor','broker','legal','tecnico']);
 const COOKIE='veo_sesion', SECONDS=7*24*60*60, MAX_FILE=45*1024*1024;

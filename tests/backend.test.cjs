@@ -238,6 +238,18 @@ test('fase 5 EN OPERACIÓN: exige expediente de cierre completo y acepta fotos/v
   assert.equal(up.status, 200, JSON.stringify(up.data));
 });
 
+test('calificación: sin compatibilidad urbana; tráfico pesa 45%', async () => {
+  const beto = await addUser('beto', 'broker');
+  db.veo_predios.push({ id: 1, code: 'VEO-01-00001', alias: 'Score', broker_id: beto.id, created_by: beto.id, active: true, phase: 'BUSQUEDA_FACTIBILIDAD', corridor_id: 1 });
+  const b = await loginAs('beto');
+  assert.equal(b.boot.data.weights.urbana, undefined);
+  assert.equal(Object.values(b.boot.data.weights).reduce((x, y) => x + y, 0), 100);
+  const solo = await call('PATCH', 'predios/1', { ...b, body: { ratings_json: JSON.stringify({ flujo: 5 }) } });
+  assert.equal(solo.status, 200); assert.equal(db.veo_predios[0].score, 45);
+  const todo = await call('PATCH', 'predios/1', { ...b, body: { ratings_json: JSON.stringify({ flujo: 5, visibilidad: 5, electrica: 5, propietario: 5, comercial: 5, urbana: 5 }) } });
+  assert.equal(todo.status, 200); assert.equal(db.veo_predios[0].score, 100);
+});
+
 test('sólo admin crea usuarios; broker no exporta CSV', async () => {
   await addUser('ana', 'admin'); await addUser('beto', 'broker');
   const b = await loginAs('beto');
