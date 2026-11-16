@@ -4,7 +4,7 @@
    sobre los centros orientativos del PDF. Sin datos: no se valida el predio. */
 (function(){'use strict';
 const aliases={
- 1:['paseo de los leones','paseo leones'],2:['garza sada','eugenio garza sada'],3:['constitucion'],4:['lazaro cardenas'],
+ 1:['paseo de los leones','paseo leones'],2:['garza sada','eugenio garza sada','carretera nacional'],3:['constitucion'],4:['lazaro cardenas'],
  5:['gonzalitos','eleuterio gonzalez','jose eleuterio gonzalez'],6:['morones prieto','ignacio morones prieto'],
  7:['nogalar'],8:['miguel aleman'],9:['pablo livas'],10:['benito juarez'],11:['ruiz cortines'],12:['abraham lincoln','av lincoln'],
  13:['felix uresti gomez','felix u gomez'],14:['francisco i madero','madero']};
