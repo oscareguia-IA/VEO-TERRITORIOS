@@ -6,7 +6,7 @@
 const aliases={
  1:['paseo de los leones','paseo leones'],2:['garza sada','eugenio garza sada','carretera nacional'],3:['constitucion'],4:['lazaro cardenas'],
  5:['gonzalitos','eleuterio gonzalez','jose eleuterio gonzalez'],6:['morones prieto','ignacio morones prieto'],
- 7:['nogalar'],8:['miguel aleman'],9:['pablo livas'],10:['benito juarez'],11:['ruiz cortines'],12:['abraham lincoln','av lincoln'],
+ 7:['nogalar'],8:['miguel aleman','boulevard aeropuerto','blvd aeropuerto','bulevar aeropuerto'],9:['pablo livas'],10:['benito juarez'],11:['ruiz cortines'],12:['abraham lincoln','av lincoln'],
  13:['felix uresti gomez','felix u gomez'],14:['francisco i madero','madero']};
 const fold=x=>String(x||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');
 function named(id,tags){return ['name','name:es','official_name','alt_name','short_name','loc_name'].some(k=>aliases[id]?.some(a=>fold(tags?.[k]).includes(fold(a))))}

@@ -25,6 +25,10 @@ PRINCIPALES = {'motorway', 'trunk', 'primary', 'secondary', 'tertiary',
 # Municipios donde el corredor NO debe entrar (relación OSM). Garza Sada sigue por la
 # Carretera Nacional hasta el Puente El Barro, que es el límite con Santiago.
 EXCLUIR_MUNICIPIO = {2: ('Santiago, N.L.', 5606346)}
+# Área propia para un nombre dentro de un corredor ampliado. Miguel Alemán (08) incluye el
+# Blvd. Aeropuerto hasta el aeropuerto, pero la Carretera Miguel Alemán no debe seguir
+# hacia Pesquería: sus puntos fuera de su área original se descartan.
+CAJA_POR_NOMBRE = {8: {'miguel aleman': [25.663, -100.319, 25.816, -100.139]}}  # hasta el entronque con el Blvd. Aeropuerto
 MIN_TRAMO_M = 1500   # tramo desconectado más corto que esto = calle homónima, se descarta
 UNION_M = 60         # extremos a menos de esto se consideran el mismo tramo
 NOMBRES = ['name', 'name:es', 'official_name', 'alt_name', 'short_name', 'loc_name']
@@ -156,7 +160,12 @@ def procesar(cid, data, cache=None):
             continue
         if not any(a in fold(tags.get(k)) for k in NOMBRES for a in alias if tags.get(k)):
             continue
-        lineas.append([[round(p['lat'], 5), round(p['lon'], 5)] for p in w['geometry']])
+        pts = [[round(p['lat'], 5), round(p['lon'], 5)] for p in w['geometry']]
+        for nombre, (s, o, n, e) in CAJA_POR_NOMBRE.get(cid, {}).items():
+            if any(nombre in fold(tags.get(k)) for k in NOMBRES if tags.get(k)):
+                pts = [p for p in pts if s <= p[0] <= n and o <= p[1] <= e]
+        if len(pts) > 1:
+            lineas.append(pts)
     if cid in EXCLUIR_MUNICIPIO:
         lineas = recortar(lineas, poligono_municipio(EXCLUIR_MUNICIPIO[cid][1], cache))
     if not lineas:
