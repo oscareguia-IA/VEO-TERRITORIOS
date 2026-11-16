@@ -79,7 +79,6 @@ async function writeLimit(me,key,res){
 }
 function tooMany(res,secs){res.setHeader('Retry-After',String(secs));return codeError(429,`Demasiados intentos fallidos. Espera ${Math.ceil(secs/60)} minutos e inténtalo de nuevo.`)}
 // ── Georreferencia de fotografías ──
-const IMAGE_EXT=/\.(jpe?g|png|webp|heic|heif)$/i;
 const DISPLAY_EXT=/\.(jpe?g|png|webp)$/i;
 const isDisplayPhoto=d=>d.doc_type==='foto'&&DISPLAY_EXT.test(String(d.original_filename||d.storage_path||''));
 const VIDEO_EXT=/\.(mp4|mov|m4v|webm)$/i;
@@ -87,8 +86,8 @@ const mediaKind=d=>{const n=String(d.original_filename||d.storage_path||'');if(V
 const mediaItem=d=>({id:d.id,kind:mediaKind(d),by:d.uploaded_by_name||'',at:d.taken_at||d.created_at,name:d.original_filename||''});
 function mediaByPredio(documents){const m={};for(const d of documents){if(!mediaKind(d))continue;(m[d.predio_id]=m[d.predio_id]||[]).push(d)}for(const k in m)m[k]=m[k].sort((a,b)=>b.id-a.id).slice(0,12).map(mediaItem);return m}
 function docGeo(b){
- const isPhoto=b.doc_type==='foto'&&IMAGE_EXT.test(String(b.original_filename||b.storage_path||''));
- if(b.geo_lat===undefined||b.geo_lat===null||b.geo_lat===''){ensure(!isPhoto,'La fotografía del predio debe estar georreferenciada (GPS de la foto o ubicación del dispositivo).');return{}}
+ // La ubicación de la foto es opcional: si la foto trae GPS (EXIF) se valida y se guarda.
+ if(b.geo_lat===undefined||b.geo_lat===null||b.geo_lat==='')return{};
  const lat=Number(b.geo_lat),lng=Number(b.geo_lng);
  ensure(Number.isFinite(lat)&&Number.isFinite(lng)&&Math.abs(lat)<=90&&Math.abs(lng)<=180,'Coordenadas de la foto inválidas.');
  ensure(['exif','dispositivo'].includes(b.geo_source),'Origen de ubicación inválido.');

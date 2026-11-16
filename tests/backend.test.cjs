@@ -187,6 +187,18 @@ test('contraseñas: se aceptan desde 7 caracteres y se rechazan con 6', async ()
   assert.equal(r.status, 200, JSON.stringify(r.data));
 });
 
+test('foto de fase 1 se acepta sin georreferencia; si trae GPS se guarda', async () => {
+  const beto = await addUser('beto', 'broker');
+  db.veo_predios.push({ id: 1, code: 'VEO-01-00001', alias: 'Foto', broker_id: beto.id, created_by: beto.id, active: true, phase: 'BUSQUEDA_FACTIBILIDAD', corridor_id: 1 });
+  const { cookie, csrf } = await loginAs('beto');
+  const sinGps = await call('POST', 'predios/1/documents/complete', { cookie, csrf, body: { doc_type: 'foto', storage_path: '1/abc-foto.jpg', original_filename: 'foto.jpg' } });
+  assert.equal(sinGps.status, 200, JSON.stringify(sinGps.data));
+  assert.equal(db.veo_documents[0].geo_lat, undefined);
+  const conGps = await call('POST', 'predios/1/documents/complete', { cookie, csrf, body: { doc_type: 'foto', storage_path: '1/def-foto.jpg', original_filename: 'foto2.jpg', geo_lat: 25.67, geo_lng: -100.31, geo_source: 'exif' } });
+  assert.equal(conGps.status, 200, JSON.stringify(conGps.data));
+  assert.equal(db.veo_documents[1].geo_lat, 25.67);
+});
+
 test('sólo admin crea usuarios; broker no exporta CSV', async () => {
   await addUser('ana', 'admin'); await addUser('beto', 'broker');
   const b = await loginAs('beto');
