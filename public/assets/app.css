@@ -886,3 +886,8 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
 .icon-btn[data-action="close-command"]:focus-visible,.icon-btn[data-action="picker-cancel"]:focus-visible{outline:3px solid #ffd2d3;outline-offset:2px}
 
 .vista-oculta{display:none!important}
+
+/* ── Flecha del norte también en el mapa de georreferenciación del predio ── */
+.picker-map-wrap{position:relative}
+.picker-map-wrap .veo-north-indicator{position:absolute;z-index:29;top:12px;right:12px;width:47px;height:74px;border:1px solid #628da7;border-radius:13px;background:#0a2036ed;box-shadow:0 7px 18px #0006;color:#ecf9ff;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;pointer-events:none;user-select:none}
+@media(max-width:700px){.picker-map-wrap .veo-north-indicator{top:8px;right:8px;width:40px;height:62px;border-radius:10px}}
