@@ -11,7 +11,7 @@ const B={
  9:[25.604,-100.283,25.704,-100.113],10:[25.595,-100.271,25.707,-100.124],
  11:[25.703,-100.483,25.812,-100.162],12:[25.736,-100.515,25.828,-100.308],
  13:[25.642,-100.336,25.750,-100.260],14:[25.663,-100.366,25.701,-100.267]};
-const P={1:'Leones',2:'Garza Sada|Carretera Nacional',3:'Constituci',4:'Lázaro|Lazaro|Cárdenas|Cardenas',5:'Gonzalitos|González|Gonzalez',6:'Morones Prieto',7:'Nogalar',8:'Alemán|Aleman|Aeropuerto',9:'Pablo Livas',10:'Juárez|Juarez',11:'Ruiz Cortines',12:'Lincoln',13:'Uresti|Félix|Felix',14:'Madero'};
+const P={1:'Leones',2:'Garza Sada|Carretera Nacional',3:'Constituci',4:'Lázaro|Lazaro|Cárdenas|Cardenas',5:'Gonzalitos|González|Gonzalez',6:'Morones Prieto',7:'Nogalar',8:'Alemán|Aleman|Aeropuerto',9:'Pablo Livas',10:'Juárez|Juarez',11:'Ru[ií]z Cort[ií]nes',12:'Lincoln',13:'Uresti|Félix|Felix',14:'Madero'};
 const mem=new Map(),pending=new Map(),expire=7*24*3600*1000;
 function store(id,data){if(data?.lines?.length){mem.set(+id,data);try{localStorage.setItem('veo_route_osm_'+id,JSON.stringify({ts:Date.now(),data}))}catch(_){}}return data}
 function cached(id){if(mem.has(+id))return mem.get(+id);try{const raw=JSON.parse(localStorage.getItem('veo_route_osm_'+id)||'null');if(raw?.data?.lines?.length){const item={...raw.data,status:Date.now()-raw.ts>expire?'cached':raw.data.status};mem.set(+id,item);return item}}catch(_){}return null}
@@ -35,7 +35,7 @@ async function direct(id){const bbox=B[id];const pattern=P[id];if(!bbox||!patter
 }
 // Trazados OSM empaquetados con la app (instantáneos y sin depender de Overpass)
 let staticData=null;
-function loadStatic(){if(!staticData)staticData=fetch('/assets/corredores-trazos.json?v=20261116-aeropuerto',{credentials:'same-origin'}).then(r=>r.ok?r.json():null).catch(()=>null);return staticData}
+function loadStatic(){if(!staticData)staticData=fetch('/assets/corredores-trazos.json?v=20261116-ruiz-cortines',{credentials:'same-origin'}).then(r=>r.ok?r.json():null).catch(()=>null);return staticData}
 async function load(id,{demo=false}={}){id=+id;if(!B[id])return {status:'invalid',lines:[],message:'Corredor inválido.'};
  const st=await loadStatic();const sl=st?.corridors?.[id];
  if(sl?.length){const r={status:'verified',lines:sl,source:'OpenStreetMap (empaquetado)',message:'Trazado vial de OpenStreetMap.'};mem.set(id,r);return r}
