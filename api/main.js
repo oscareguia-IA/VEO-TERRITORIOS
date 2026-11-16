@@ -51,8 +51,9 @@ const clearSession=res=>res.setHeader('Set-Cookie',`${COOKIE}=; Path=/; Max-Age=
 function send(res,status,obj){res.statusCode=status;res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify(obj))}
 const audit=(me,predio_id,kind,detail)=>add('veo_activity',{predio_id:predio_id||null,user_id:me.id,user_name:me.display_name,kind,detail});
 const mayManage=u=>['admin','supervisor'].includes(u.role);
-const canSee=(u,p)=>u.role!=='broker'||+p.broker_id===+u.id||+p.created_by===+u.id;
-const canEdit=(u,p)=>canSee(u,p)&&(u.role!=='broker'||+p.broker_id===+u.id||+p.created_by===+u.id);
+// Un broker sólo accede a los predios que tiene asignados hoy: al reasignar, el anterior pierde el acceso.
+const canSee=(u,p)=>u.role!=='broker'||+p.broker_id===+u.id;
+const canEdit=canSee;
 async function predioFor(me,id){const p=await one('veo_predios',{id:`eq.${id}`});ensure(p&&canSee(me,p),'No existe el predio o no tienes permiso.',404);return p}
 const cleanText=(v,max=2000)=>String(v??'').trim().slice(0,max);
 const validUsername=(str)=>/^[a-zA-Z0-9._-]{3,50}$/.test(str);
@@ -151,7 +152,7 @@ async function handle(req,res){
   const result={user:safeUser(me),csrf,must_change_password:me.must_change_password};
   if(me.must_change_password)return result;
   // Brokers: la base filtra sus predios; canSee() se mantiene como segunda barrera.
-  const predioQuery={active:'eq.true',order:'updated_at.desc',limit:3000};if(me.role==='broker')predioQuery.or=`(broker_id.eq.${+me.id},created_by.eq.${+me.id})`;
+  const predioQuery={active:'eq.true',order:'updated_at.desc',limit:3000};if(me.role==='broker')predioQuery.broker_id=`eq.${+me.id}`;
   const docCols='id,predio_id,doc_type,storage_path,original_filename,uploaded_by_name,created_at,geo_lat,geo_lng,geo_source,taken_at';
   const [users,ps,documents,requests,activity]=await Promise.all([list('veo_users',{order:'id.asc'}),list('veo_predios',predioQuery),list('veo_documents',{select:docCols,limit:10000}),list('veo_requests',{order:'created_at.desc',limit:1000}),list('veo_activity',{order:'created_at.desc',limit:50})]);
   const visible=ps.filter(p=>p.active&&canSee(me,p));const ids=new Set(visible.map(p=>p.id));const names=Object.fromEntries(users.map(x=>[x.id,x.display_name]));
@@ -188,7 +189,7 @@ async function handle(req,res){
   const geo=await validateGeo(+b.corridor_id,{lat:b.lat,lng:b.lng});ensure(geo.status!=='outside',geo.message);
   const broker=me.role==='broker'?me.id:(b.broker_id?+b.broker_id:null);
   if(broker){const assigned=await one('veo_users',{id:`eq.${broker}`});ensure(assigned?.active&&assigned.role==='broker','Selecciona un broker activo.')}
-  let p=await add('veo_predios',{corridor_id:+b.corridor_id,alias:cleanText(b.alias,240),broker_id:broker,lat:+b.lat,lng:+b.lng,geo_status:geo.ok?'verificado':'pendiente',geo_checked_at:new Date().toISOString(),created_by:me.id});
+  let p=await add('veo_predios',{corridor_id:+b.corridor_id,alias:cleanText(b.alias,240),broker_id:broker,lat:+b.lat,lng:+b.lng,created_by:me.id});
   p=await patch('veo_predios',p.id,{code:`VEO-${String(p.corridor_id).padStart(2,'0')}-${String(p.id).padStart(5,'0')}`});await audit(me,p.id,'alta',`Nuevo predio ${p.code}`);return{id:p.id,code:p.code};
  }
  if(parts[0]==='predios'&&parts[1]){
@@ -207,7 +208,7 @@ async function handle(req,res){
    if('broker_id' in up){up.broker_id=up.broker_id?Number(up.broker_id):null;if(up.broker_id){const broker=await one('veo_users',{id:`eq.${up.broker_id}`});ensure(broker?.role==='broker'&&broker.active,'Broker no disponible.')}}
    if('permiso_status' in up&&up.permiso_status==='autorizado'){const docs=await list('veo_documents',{predio_id:`eq.${pid}`});ensure(docs.some(d=>d.doc_type==='permiso_municipal'),'Adjunta el permiso municipal antes de autorizar.');}
    if('ratings_json' in up){let r;try{r=JSON.parse(up.ratings_json)}catch{throw codeError(400,'Calificación inválida.')}up.score=Math.round(Object.keys(WEIGHTS).reduce((n,k)=>n+(+r[k]||0)*WEIGHTS[k]/5,0));ensure(up.score>=0&&up.score<=100,'Calificación fuera de rango.');}
-   if(['lat','lng','corridor_id'].some(f=>f in up)){const id=Number(up.corridor_id??p.corridor_id),pt={lat:up.lat??p.lat,lng:up.lng??p.lng};if(id!==p.corridor_id||+pt.lat!==p.lat||+pt.lng!==p.lng){const geo=await validateGeo(id,pt);ensure(geo.status!=='outside',geo.message);up.geo_status=geo.ok?'verificado':'pendiente';up.geo_checked_at=new Date().toISOString();}}
+   if(['lat','lng','corridor_id'].some(f=>f in up)){const id=Number(up.corridor_id??p.corridor_id),pt={lat:up.lat??p.lat,lng:up.lng??p.lng};if(id!==p.corridor_id||+pt.lat!==p.lat||+pt.lng!==p.lng){const geo=await validateGeo(id,pt);ensure(geo.status!=='outside',geo.message);}}
    up.updated_at=new Date().toISOString();await patch('veo_predios',pid,up);await audit(me,pid,'edicion','Actualizó expediente');return{ok:true};
   }
   if(parts.length===2&&method==='DELETE'){
@@ -218,7 +219,6 @@ async function handle(req,res){
   }
   if(parts[2]==='comments'&&method==='POST'){ensure(canEdit(me,p),'No puedes comentar.',403);ensure(cleanText(b.body,5000),'Comentario vacío.');await add('veo_comments',{predio_id:pid,user_id:me.id,author:me.display_name,body:cleanText(b.body,5000)});await audit(me,pid,'comentario','Agregó comentario');return{ok:true}}
   if(parts[2]==='archive'&&method==='POST'){ensure(mayManage(me),'Sólo supervisión puede archivar.',403);await patch('veo_predios',pid,{active:!!b.restore,updated_at:new Date().toISOString()});await audit(me,pid,'archivo',b.restore?'Restauró predio':'Archivó predio');return{ok:true}}
-  if(parts[2]==='geo'&&parts[3]==='revalidate'&&method==='POST'){ensure(canEdit(me,p),'No tienes permiso.',403);const geo=await validateGeo(p.corridor_id,{lat:p.lat,lng:p.lng});const status=geo.ok?'verificado':geo.status==='outside'?'fuera_corredor':'pendiente';await patch('veo_predios',pid,{geo_status:status,geo_checked_at:new Date().toISOString()});await audit(me,pid,'geo',`Revalidación: ${status}`);return {result:geo,geo_status:status}}
   if(parts[2]==='request'&&method==='POST'){ensure(canEdit(me,p),'No puedes solicitar avance.',403);const to=PHASES[PHASES.indexOf(p.phase)+1];ensure(to,'El predio ya está en cierre.');const docs=await list('veo_documents',{predio_id:`eq.${pid}`});const missing=reqItems(p,docs,to).filter(x=>!x.done).map(x=>x.label);ensure(!missing.length,'Faltan requisitos: '+missing.join('; '));const pending=await list('veo_requests',{predio_id:`eq.${pid}`,status:'eq.pendiente'});ensure(!pending.length,'Ya hay una solicitud pendiente.');await add('veo_requests',{predio_id:pid,from_phase:p.phase,to_phase:to,code:p.code,alias:p.alias,requester_name:me.display_name,reason:cleanText(b.reason,500)});await audit(me,pid,'solicitud',`Solicitó avance a ${to}`);return {ok:true}}
   if(parts[2]==='documents'&&parts[3]==='sign'&&method==='POST'){
    ensure(canEdit(me,p),'Sin permiso para adjuntar.',403);ensure(DOC_TYPES.has(b.doc_type),'Tipo documental no válido.');ensure(Number.isSafeInteger(b.size_bytes)&&b.size_bytes>0&&b.size_bytes<=MAX_FILE,'El archivo debe ser de máximo 45 MB.');

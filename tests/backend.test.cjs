@@ -149,11 +149,33 @@ test('broker sólo ve y edita sus predios', async () => {
                       { id: 2, code: 'VEO-01-00002', alias: 'De Caro', broker_id: caro.id, created_by: 1, active: true, phase: 'BUSQUEDA_FACTIBILIDAD' });
   const { cookie, csrf, boot } = await loginAs('beto');
   assert.deepEqual(boot.data.predios.map(p => p.id), [1]);
-  const q = lastQueries.find(x => x.name === 'veo_predios' && x.params.or);
+  const q = lastQueries.find(x => x.name === 'veo_predios' && x.params.broker_id);
   assert.ok(q, 'la consulta de predios del broker debe filtrarse en la base');
   assert.equal((await call('GET', 'predios/2', { cookie })).status, 404);
   assert.equal((await call('PATCH', 'predios/2', { cookie, csrf, body: { alias: 'robado' } })).status, 404);
   assert.equal((await call('PATCH', 'predios/1', { cookie, csrf, body: { alias: 'ok' } })).status, 200);
+});
+
+test('al reasignar un predio, el broker que lo creó pierde el acceso', async () => {
+  await addUser('ana', 'admin'); const beto = await addUser('beto', 'broker'); const caro = await addUser('caro', 'broker');
+  // Beto lo registró, pero hoy está asignado a Caro
+  db.veo_predios.push({ id: 1, code: 'VEO-01-00001', alias: 'Reasignado', broker_id: caro.id, created_by: beto.id, active: true, phase: 'BUSQUEDA_FACTIBILIDAD', propietario: 'Dueño', telefono: '8110000000' });
+  const b = await loginAs('beto');
+  assert.deepEqual(b.boot.data.predios.map(p => p.id), []);
+  assert.equal((await call('GET', 'predios/1', { cookie: b.cookie })).status, 404);
+  assert.equal((await call('PATCH', 'predios/1', { cookie: b.cookie, csrf: b.csrf, body: { telefono: 'x' } })).status, 404);
+  assert.equal((await call('POST', 'predios/1/comments', { cookie: b.cookie, csrf: b.csrf, body: { body: 'hola' } })).status, 404);
+  const c = await loginAs('caro');
+  assert.deepEqual(c.boot.data.predios.map(p => p.id), [1]);
+});
+
+test('nuevo predio no se marca como verificado y ya no existe la revalidación', async () => {
+  await addUser('beto', 'broker');
+  const { cookie, csrf } = await loginAs('beto');
+  const r = await call('POST', 'predios', { cookie, csrf, body: { alias: 'Nuevo', corridor_id: 1, lat: 25.67, lng: -100.31 } });
+  assert.equal(r.status, 200);
+  assert.equal(db.veo_predios[0].geo_status, undefined);
+  assert.equal((await call('POST', 'predios/1/geo/revalidate', { cookie, csrf, body: {} })).status, 404);
 });
 
 test('sólo admin crea usuarios; broker no exporta CSV', async () => {
