@@ -199,6 +199,17 @@ test('foto de fase 1 se acepta sin georreferencia; si trae GPS se guarda', async
   assert.equal(db.veo_documents[1].geo_lat, 25.67);
 });
 
+test('fase 1 → contacto: el video con dron es opcional', async () => {
+  const beto = await addUser('beto', 'broker');
+  db.veo_predios.push({ id: 1, code: 'VEO-01-00001', alias: 'Sin dron', broker_id: beto.id, created_by: beto.id, active: true, phase: 'BUSQUEDA_FACTIBILIDAD', corridor_id: 1, lat: 25.67, lng: -100.31, score: 80, dron_url: null });
+  db.veo_documents.push({ id: 1, predio_id: 1, doc_type: 'foto', storage_path: '1/f.jpg' }, { id: 2, predio_id: 1, doc_type: 'satelital', storage_path: '1/s.png' });
+  const { cookie, csrf } = await loginAs('beto');
+  const det = await call('GET', 'predios/1', { cookie });
+  assert.ok(!det.data.next_requirements.some(x => /dron/i.test(x.label)), 'el dron no debe aparecer como requisito');
+  const r = await call('POST', 'predios/1/request', { cookie, csrf, body: {} });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+});
+
 test('sólo admin crea usuarios; broker no exporta CSV', async () => {
   await addUser('ana', 'admin'); await addUser('beto', 'broker');
   const b = await loginAs('beto');

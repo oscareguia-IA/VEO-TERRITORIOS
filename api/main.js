@@ -58,7 +58,7 @@ async function predioFor(me,id){const p=await one('veo_predios',{id:`eq.${id}`})
 const cleanText=(v,max=2000)=>String(v??'').trim().slice(0,max);
 const validUsername=(str)=>/^[a-zA-Z0-9._-]{3,50}$/.test(str);
 const reqItems=(p,docs,to)=>{const found=t=>docs.some(x=>x.doc_type===t),items=[];const push=(label,done)=>items.push({key:label,label,done:!!done});
- if(to==='PRIMER_CONTACTO'){push('Broker asignado',p.broker_id);push('Ubicación registrada (pin GPS)',p.lat!=null&&p.lng!=null);push('Fotografía del predio',found('foto'));push('Evidencia de mapa satelital',found('satelital'));push('Video con dron (archivo o enlace en expediente)',found('dron')||/^https?:\/\//.test(p.dron_url||''));push('Calificación ≥70/100',p.score>=70)}
+ if(to==='PRIMER_CONTACTO'){push('Broker asignado',p.broker_id);push('Ubicación registrada (pin GPS)',p.lat!=null&&p.lng!=null);push('Fotografía del predio',found('foto'));push('Evidencia de mapa satelital',found('satelital'));push('Calificación ≥70/100',p.score>=70)}
  if(to==='SEGUIMIENTO'){push('Nombre del dueño / administrador',p.propietario);push('Teléfono o correo de contacto',p.telefono||p.email);push('Fecha del primer contacto',p.fecha_contacto);push('Respuesta no descartada',['evaluando','interesado'].includes(p.interes))}
  if(to==='CIERRE'){push('Carta de intención presentada',found('carta_intencion'));push('Interés confirmado del propietario',p.interes==='interesado');push('Condición de permiso municipal explicada',p.clausula_condicional)}return items;
 };
