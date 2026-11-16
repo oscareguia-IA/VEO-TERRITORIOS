@@ -12,6 +12,7 @@ if(process.env.SENTRY_DSN){try{Sentry=require('@sentry/node');Sentry.init({dsn:p
  beforeSend(ev){if(ev.request){delete ev.request.cookies;delete ev.request.data;if(ev.request.headers){for(const h of ['cookie','x-csrf-token','authorization'])delete ev.request.headers[h]}}if(ev.user)ev.user={id:ev.user.id};return ev}})}catch(e){console.error('Sentry init',e.message);Sentry=null}}
 const PHASES=['BUSQUEDA_FACTIBILIDAD','PRIMER_CONTACTO','SEGUIMIENTO','CIERRE','EN_OPERACION'];
 const LAST_PHASE=PHASES[PHASES.length-1];
+const PHASE_LABEL={BUSQUEDA_FACTIBILIDAD:'Búsqueda / Factibilidad',PRIMER_CONTACTO:'Primer contacto',SEGUIMIENTO:'Seguimiento',CIERRE:'Cierre',EN_OPERACION:'En operación'};
 const WEIGHTS={flujo:45,visibilidad:25,electrica:10,propietario:10,comercial:10};
 const DOC_TYPES=new Set(['foto','satelital','dron','carta_intencion','contrato','mecanica_suelos','memoria_calculo','factibilidad_electrica','permiso_municipal','operacion','otro']);
 const ROLES=new Set(['admin','supervisor','broker','legal','tecnico']);
@@ -237,8 +238,12 @@ async function handle(req,res){
  }
  if(parts[0]==='requests'&&parts[2]==='resolve'&&method==='POST'){
   ensure(mayManage(me),'Sólo supervisión puede aprobar.',403);const r=await one('veo_requests',{id:`eq.${+parts[1]}`});ensure(r&&r.status==='pendiente','Solicitud ya resuelta o inexistente.',404);const p=await predioFor(me,r.predio_id);ensure(['aprobada','rechazada'].includes(b.decision),'Decisión inválida.');
+  // Rechazar exige motivo; el motivo queda en la bitácora del predio.
+  const note=cleanText(b.review_note,500);if(b.decision==='rechazada')ensure(note.length>=5,'Escribe el motivo del rechazo (mínimo 5 caracteres); quedará en la bitácora.');
   if(b.decision==='aprobada'){const docs=await list('veo_documents',{predio_id:`eq.${p.id}`});const missing=reqItems(p,docs,r.to_phase).filter(x=>!x.done);ensure(!missing.length,'Faltan requisitos: '+missing.map(x=>x.label).join('; '));await patch('veo_predios',p.id,{phase:r.to_phase,updated_at:new Date().toISOString()})}
-  await patch('veo_requests',r.id,{status:b.decision,review_note:cleanText(b.review_note,500)});await audit(me,p.id,'fase',`Solicitud ${b.decision}: ${r.to_phase}`);return{ok:true};
+  await patch('veo_requests',r.id,{status:b.decision,review_note:note});
+  const etapa=PHASE_LABEL[r.to_phase]||r.to_phase;
+  await audit(me,p.id,'fase',b.decision==='rechazada'?`Rechazó el avance a ${etapa}. Motivo: ${note}`:`Aprobó el avance a ${etapa}${note?'. Comentario: '+note:''}`);return{ok:true};
  }
  if(parts[0]==='documents'&&parts[1]){
   const d=await one('veo_documents',{id:`eq.${+parts[1]}`});ensure(d,'Documento no encontrado.',404);const p=await predioFor(me,d.predio_id);

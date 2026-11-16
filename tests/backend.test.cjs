@@ -250,6 +250,24 @@ test('calificación: sin compatibilidad urbana; tráfico pesa 45%', async () => 
   assert.equal(todo.status, 200); assert.equal(db.veo_predios[0].score, 100);
 });
 
+test('rechazar cambio de fase exige motivo y lo registra en la bitácora', async () => {
+  await addUser('ana', 'admin'); const beto = await addUser('beto', 'broker');
+  db.veo_predios.push({ id: 1, code: 'VEO-01-00001', alias: 'Rechazo', broker_id: beto.id, created_by: beto.id, active: true, phase: 'BUSQUEDA_FACTIBILIDAD', corridor_id: 1 });
+  db.veo_requests.push({ id: 1, predio_id: 1, from_phase: 'BUSQUEDA_FACTIBILIDAD', to_phase: 'PRIMER_CONTACTO', status: 'pendiente' });
+  const a = await loginAs('ana');
+  assert.equal((await call('POST', 'requests/1/resolve', { ...a, body: { decision: 'rechazada' } })).status, 400);
+  assert.equal((await call('POST', 'requests/1/resolve', { ...a, body: { decision: 'rechazada', review_note: '   ' } })).status, 400);
+  assert.equal(db.veo_requests[0].status, 'pendiente');
+  const ok = await call('POST', 'requests/1/resolve', { ...a, body: { decision: 'rechazada', review_note: 'Falta la captura satelital' } });
+  assert.equal(ok.status, 200, JSON.stringify(ok.data));
+  assert.equal(db.veo_requests[0].status, 'rechazada');
+  assert.equal(db.veo_requests[0].review_note, 'Falta la captura satelital');
+  assert.equal(db.veo_predios[0].phase, 'BUSQUEDA_FACTIBILIDAD');
+  const log = db.veo_activity.find(x => x.kind === 'fase');
+  assert.match(log.detail, /Rechazó el avance a Primer contacto\. Motivo: Falta la captura satelital/);
+  assert.equal(log.predio_id, 1);
+});
+
 test('sólo admin crea usuarios; broker no exporta CSV', async () => {
   await addUser('ana', 'admin'); await addUser('beto', 'broker');
   const b = await loginAs('beto');
