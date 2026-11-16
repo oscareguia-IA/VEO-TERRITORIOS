@@ -210,6 +210,34 @@ test('fase 1 → contacto: el video con dron es opcional', async () => {
   assert.equal(r.status, 200, JSON.stringify(r.data));
 });
 
+test('fase 5 EN OPERACIÓN: exige expediente de cierre completo y acepta fotos/videos de operación', async () => {
+  await addUser('ana', 'admin'); const beto = await addUser('beto', 'broker');
+  db.veo_predios.push({ id: 1, code: 'VEO-02-00001', alias: 'Cerrado', broker_id: beto.id, created_by: beto.id, active: true, phase: 'CIERRE', corridor_id: 2, lat: 25.6, lng: -100.2, score: 80, permiso_status: 'en_tramite', clausula_condicional: true });
+  const b = await loginAs('beto');
+  // Sin expediente completo no se puede solicitar
+  let det = await call('GET', 'predios/1', { cookie: b.cookie });
+  assert.ok(det.data.next_requirements.length > 0);
+  assert.equal((await call('POST', 'predios/1/request', { ...b, body: {} })).status, 400);
+  // Expediente completo: contrato, estudios, permiso municipal y permiso autorizado
+  for (const [i, t] of ['contrato', 'mecanica_suelos', 'memoria_calculo', 'factibilidad_electrica', 'permiso_municipal'].entries())
+    db.veo_documents.push({ id: i + 1, predio_id: 1, doc_type: t, storage_path: `1/${t}.pdf` });
+  db.veo_predios[0].permiso_status = 'autorizado';
+  assert.equal((await call('POST', 'predios/1/request', { ...b, body: {} })).status, 200);
+  const a = await loginAs('ana');
+  const r = db.veo_requests[0];
+  r.status = 'pendiente'; // el Supabase simulado no aplica el valor por defecto de la columna
+  assert.equal(r.to_phase, 'EN_OPERACION');
+  assert.equal((await call('POST', `requests/${r.id}/resolve`, { ...a, body: { decision: 'aprobada' } })).status, 200);
+  assert.equal(db.veo_predios[0].phase, 'EN_OPERACION');
+  // En operación: no hay fase siguiente y se aceptan fotos/videos de operación
+  det = await call('GET', 'predios/1', { cookie: b.cookie });
+  assert.deepEqual(det.data.next_requirements, []);
+  assert.equal(det.data.readiness.complete, true);
+  assert.equal((await call('POST', 'predios/1/request', { ...b, body: {} })).status, 400);
+  const up = await call('POST', 'predios/1/documents/complete', { ...b, body: { doc_type: 'operacion', storage_path: '1/x-sitio.mp4', original_filename: 'sitio.mp4' } });
+  assert.equal(up.status, 200, JSON.stringify(up.data));
+});
+
 test('sólo admin crea usuarios; broker no exporta CSV', async () => {
   await addUser('ana', 'admin'); await addUser('beto', 'broker');
   const b = await loginAs('beto');
