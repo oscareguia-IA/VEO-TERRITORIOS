@@ -1,4 +1,4 @@
-const CACHE='veo-vercel-2026-11-16-docs-color';
+const CACHE='veo-vercel-2026-11-16-docs-lista';
 const CORE=['/','/index.html','/assets/app.css','/assets/crm.js','/assets/mapa-fluido.js','/assets/geoverificacion.js','/assets/geo-foto.js','/assets/google-mapa.js','/assets/trazados.js','/assets/datos-corredores.js','/assets/gestos-moviles.js','/assets/media/veo-icon-192.png'];
 self.addEventListener('install',ev=>{ev.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)));self.skipWaiting()});
 self.addEventListener('activate',ev=>{ev.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim()});
