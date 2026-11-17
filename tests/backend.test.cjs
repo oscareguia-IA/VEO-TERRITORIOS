@@ -219,8 +219,8 @@ test('fase 5 EN OPERACIÓN: exige expediente de cierre completo y acepta fotos/v
   assert.ok(det.data.next_requirements.length > 0);
   assert.equal((await call('POST', 'predios/1/request', { ...b, body: {} })).status, 400);
   // Expediente completo: contrato, estudios, permiso municipal y permiso autorizado
-  // Mecánica de suelos es opcional: no se adjunta y aun así se puede avanzar
-  for (const [i, t] of ['contrato', 'memoria_calculo', 'factibilidad_electrica', 'permiso_municipal'].entries())
+  // Mecánica de suelos y documento de permiso municipal son opcionales: no se adjuntan y aun así se puede avanzar
+  for (const [i, t] of ['contrato', 'memoria_calculo', 'factibilidad_electrica'].entries())
     db.veo_documents.push({ id: i + 1, predio_id: 1, doc_type: t, storage_path: `1/${t}.pdf` });
   db.veo_predios[0].permiso_status = 'autorizado';
   assert.equal((await call('POST', 'predios/1/request', { ...b, body: {} })).status, 200);
@@ -267,6 +267,17 @@ test('rechazar cambio de fase exige motivo y lo registra en la bitácora', async
   const log = db.veo_activity.find(x => x.kind === 'fase');
   assert.match(log.detail, /Rechazó el avance a Primer contacto\. Motivo: Falta la captura satelital/);
   assert.equal(log.predio_id, 1);
+});
+
+test('permiso municipal: se puede marcar Autorizado sin adjuntar el documento', async () => {
+  await addUser('ana', 'admin');
+  db.veo_predios.push({ id: 1, code: 'VEO-01-00001', alias: 'Permiso', broker_id: null, created_by: 1, active: true, phase: 'CIERRE', corridor_id: 1 });
+  const a = await loginAs('ana');
+  const r = await call('PATCH', 'predios/1', { ...a, body: { permiso_status: 'autorizado' } });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(db.veo_predios[0].permiso_status, 'autorizado');
+  const det = await call('GET', 'predios/1', { cookie: a.cookie });
+  assert.ok(!det.data.readiness.items.some(x => /documento de permiso/i.test(x.label)));
 });
 
 test('sólo admin crea usuarios; broker no exporta CSV', async () => {
