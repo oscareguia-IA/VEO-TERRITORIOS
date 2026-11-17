@@ -219,7 +219,8 @@ test('fase 5 EN OPERACIÓN: exige expediente de cierre completo y acepta fotos/v
   assert.ok(det.data.next_requirements.length > 0);
   assert.equal((await call('POST', 'predios/1/request', { ...b, body: {} })).status, 400);
   // Expediente completo: contrato, estudios, permiso municipal y permiso autorizado
-  for (const [i, t] of ['contrato', 'mecanica_suelos', 'memoria_calculo', 'factibilidad_electrica', 'permiso_municipal'].entries())
+  // Mecánica de suelos es opcional: no se adjunta y aun así se puede avanzar
+  for (const [i, t] of ['contrato', 'memoria_calculo', 'factibilidad_electrica', 'permiso_municipal'].entries())
     db.veo_documents.push({ id: i + 1, predio_id: 1, doc_type: t, storage_path: `1/${t}.pdf` });
   db.veo_predios[0].permiso_status = 'autorizado';
   assert.equal((await call('POST', 'predios/1/request', { ...b, body: {} })).status, 200);

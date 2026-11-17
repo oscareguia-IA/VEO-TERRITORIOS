@@ -66,7 +66,8 @@ const reqItems=(p,docs,to)=>{const found=t=>docs.some(x=>x.doc_type===t),items=[
  // Para pasar a EN OPERACIÓN el expediente de cierre debe estar completo (contrato, estudios y permiso autorizado).
  if(to==='EN_OPERACION')for(const it of readiness(p,docs).items)push(it.label,it.done);return items;
 };
-function readiness(p,docs){const x=[['contrato','Contrato firmado / condicionado'],['mecanica_suelos','Estudio de mecánica de suelos'],['memoria_calculo','Memoria de cálculo estructural'],['factibilidad_electrica','Factibilidad eléctrica'],['permiso_municipal','Documento de permiso municipal']].map(([key,label])=>({key,label,done:docs.some(d=>d.doc_type===key)}));x.push({key:'permiso',label:'Permiso municipal autorizado',done:p.permiso_status==='autorizado'},{key:'clausula',label:'Cláusula suspensiva reconocida',done:!!p.clausula_condicional});return {complete:['CIERRE','EN_OPERACION'].includes(p.phase)&&x.every(q=>q.done),items:x}}
+// Mecánica de suelos es opcional (se puede adjuntar, pero no bloquea la operación).
+function readiness(p,docs){const x=[['contrato','Contrato firmado / condicionado'],['memoria_calculo','Memoria de cálculo estructural'],['factibilidad_electrica','Factibilidad eléctrica'],['permiso_municipal','Documento de permiso municipal']].map(([key,label])=>({key,label,done:docs.some(d=>d.doc_type===key)}));x.push({key:'permiso',label:'Permiso municipal autorizado',done:p.permiso_status==='autorizado'},{key:'clausula',label:'Cláusula suspensiva reconocida',done:!!p.clausula_condicional});return {complete:['CIERRE','EN_OPERACION'].includes(p.phase)&&x.every(q=>q.done),items:x}}
 // ── Límite de intentos (anti fuerza bruta) ──
 const LOGIN_USER_MAX=5, LOGIN_IP_MAX=20, LOGIN_WINDOW_S=900, LOGIN_LOCK_S=900;
 const DUMMY_HASH='scrypt$00000000000000000000000000000000000000$'+'0'.repeat(128);

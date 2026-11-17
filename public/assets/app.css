@@ -916,3 +916,12 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
 .install-modal{max-width:520px;width:100%}
 .install-steps{margin:14px 0 0;padding-left:22px;display:grid;gap:12px;font-size:14px;line-height:1.5;color:#dbe9f5}
 @media(max-width:700px){.install-strip{flex-wrap:wrap}.install-strip .btn{margin-left:0}}
+
+/* Expediente documental: tipos ya subidos en verde */
+.doc-chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 16px}
+.doc-chip{border:1px solid #33506b;background:#16283c;color:#9fb6ca;border-radius:999px;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer;line-height:1.2}
+.doc-chip b{background:#0e1d2c;border-radius:999px;padding:1px 6px;margin-left:3px;font-size:10px}
+.doc-chip.done{border-color:#2fbf84;background:#123d2f;color:#7ff0bf}
+.doc-chip.done b{background:#1d5a45;color:#d9fff0}
+.doc-chip.picked{outline:2px solid #21cee5;outline-offset:1px}
+select option.opt-done{color:#2fbf84;font-weight:700}
