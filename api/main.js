@@ -14,7 +14,7 @@ const PHASES=['BUSQUEDA_FACTIBILIDAD','PRIMER_CONTACTO','SEGUIMIENTO','CIERRE','
 const LAST_PHASE=PHASES[PHASES.length-1];
 const PHASE_LABEL={BUSQUEDA_FACTIBILIDAD:'Búsqueda / Factibilidad',PRIMER_CONTACTO:'Primer contacto',SEGUIMIENTO:'Seguimiento',CIERRE:'Cierre',EN_OPERACION:'En operación'};
 const WEIGHTS={flujo:45,visibilidad:25,electrica:10,propietario:10,comercial:10};
-const DOC_TYPES=new Set(['foto','satelital','dron','carta_intencion','contrato','mecanica_suelos','memoria_calculo','factibilidad_electrica','permiso_municipal','operacion','otro']);
+const DOC_TYPES=new Set(['foto','satelital','dron','carta_intencion','predial','contrato','mecanica_suelos','memoria_calculo','factibilidad_electrica','permiso_municipal','operacion','otro']);
 const ROLES=new Set(['admin','supervisor','broker','legal','tecnico']);
 const COOKIE='veo_sesion', SECONDS=7*24*60*60, MAX_FILE=45*1024*1024;
 const codeError=(status,detail)=>Object.assign(new Error(detail),{status});
@@ -61,7 +61,7 @@ const cleanText=(v,max=2000)=>String(v??'').trim().slice(0,max);
 const validUsername=(str)=>/^[a-zA-Z0-9._-]{3,50}$/.test(str);
 const reqItems=(p,docs,to)=>{const found=t=>docs.some(x=>x.doc_type===t),items=[];const push=(label,done)=>items.push({key:label,label,done:!!done});
  if(to==='PRIMER_CONTACTO'){push('Broker asignado',p.broker_id);push('Ubicación registrada (pin GPS)',p.lat!=null&&p.lng!=null);push('Fotografía del predio',found('foto'));push('Evidencia de mapa satelital',found('satelital'));push('Calificación ≥70/100',p.score>=70)}
- if(to==='SEGUIMIENTO'){push('Nombre del dueño / administrador',p.propietario);push('Teléfono o correo de contacto',p.telefono||p.email);push('Fecha del primer contacto',p.fecha_contacto);push('Respuesta no descartada',['evaluando','interesado'].includes(p.interes))}
+ if(to==='SEGUIMIENTO'){push('Nombre del dueño / administrador',p.propietario);push('Teléfono o correo de contacto',p.telefono||p.email);push('Fecha del primer contacto',p.fecha_contacto);push('Respuesta no descartada',['evaluando','interesado'].includes(p.interes));push('Recibo de pago del predial',found('predial'))}
  if(to==='CIERRE'){push('Carta de intención presentada',found('carta_intencion'));push('Interés confirmado del propietario',p.interes==='interesado');push('Condición de permiso municipal explicada',p.clausula_condicional)}
  // Para pasar a EN OPERACIÓN el expediente de cierre debe estar completo (contrato, estudios y permiso autorizado).
  if(to==='EN_OPERACION')for(const it of readiness(p,docs).items)push(it.label,it.done);return items;

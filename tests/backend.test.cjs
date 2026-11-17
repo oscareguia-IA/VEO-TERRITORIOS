@@ -280,6 +280,22 @@ test('permiso municipal: se puede marcar Autorizado sin adjuntar el documento', 
   assert.ok(!det.data.readiness.items.some(x => /documento de permiso/i.test(x.label)));
 });
 
+test('fase 2 → 3 exige el recibo de pago del predial', async () => {
+  const beto = await addUser('beto', 'broker');
+  db.veo_predios.push({ id: 1, code: 'VEO-01-00001', alias: 'Predial', broker_id: beto.id, created_by: beto.id, active: true, phase: 'PRIMER_CONTACTO', corridor_id: 1,
+    propietario: 'Dueño', telefono: '8110000000', fecha_contacto: '2026-11-16', interes: 'interesado' });
+  const b = await loginAs('beto');
+  let det = await call('GET', 'predios/1', { cookie: b.cookie });
+  const req = det.data.next_requirements.find(x => /predial/i.test(x.label));
+  assert.ok(req && !req.done, 'el recibo del predial debe aparecer como requisito pendiente');
+  assert.equal((await call('POST', 'predios/1/request', { ...b, body: {} })).status, 400);
+  const up = await call('POST', 'predios/1/documents/complete', { ...b, body: { doc_type: 'predial', storage_path: '1/x-predial.pdf', original_filename: 'predial.pdf' } });
+  assert.equal(up.status, 200, JSON.stringify(up.data));
+  det = await call('GET', 'predios/1', { cookie: b.cookie });
+  assert.ok(det.data.next_requirements.every(x => x.done));
+  assert.equal((await call('POST', 'predios/1/request', { ...b, body: {} })).status, 200);
+});
+
 test('sólo admin crea usuarios; broker no exporta CSV', async () => {
   await addUser('ana', 'admin'); await addUser('beto', 'broker');
   const b = await loginAs('beto');
