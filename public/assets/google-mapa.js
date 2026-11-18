@@ -9,6 +9,8 @@
       <path d="M17 1.5C8.4 1.5 1.5 8.3 1.5 16.8 1.5 28.3 17 42.5 17 42.5S32.5 28.3 32.5 16.8C32.5 8.3 25.6 1.5 17 1.5Z" fill="${color}" stroke="#fff" stroke-width="3"/>
       <circle cx="17" cy="16.5" r="5" fill="#fff"/></svg>`);
 
+  const clusterSvg=(n)=>{const r=n<10?20:n<50?24:28,d=r*2+12;return {d,url:'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${d}" height="${d}" viewBox="0 0 ${d} ${d}"><circle cx="${d/2}" cy="${d/2}" r="${r+5}" fill="#fa3b74" fill-opacity=".28"/><circle cx="${d/2}" cy="${d/2}" r="${r}" fill="#fa3b74" stroke="#fff" stroke-width="3"/></svg>`)}};
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fecha=v=>{const d=new Date(v);return isNaN(d)?'':d.toLocaleDateString('es-MX',{day:'numeric',month:'short',year:'numeric'})};
   const mediaUrl=m=>'/api/documents/'+encodeURIComponent(m.id)+'/content';
@@ -70,26 +72,40 @@
     }
 
     setMarkers(markers){
+      try{this.clusterer?.clearMarkers();this.clusterer?.setMap?.(null)}catch(_){}this.clusterer=null;
       for(const m of this.markerObjs)m.setMap(null);
       this.markerObjs=[];this.byPredio=new Map();this.closeInfo();
       if(this.destroyed)return;
+      // Agrupación de pines al alejar el mapa (librería oficial de Google); si no cargó, pines sueltos.
+      const MC=window.markerClusterer,predioMarkers=[];
       const gm=this.gm,hover=!window.matchMedia?.('(hover: none)').matches;
       for(const item of markers||[]){
         if(!Number.isFinite(item.lat)||!Number.isFinite(item.lng))continue;
         const isPhoto=item.kind==='foto',key=String(item.key||item.id);
         const marker=new gm.Marker({
-          map:this.map,position:{lat:item.lat,lng:item.lng},title:item.label||item.name||'',
+          map:(MC&&!isPhoto)?null:this.map,position:{lat:item.lat,lng:item.lng},title:item.label||item.name||'',
           zIndex:isPhoto?5:20,optimized:true,
           icon:isPhoto
             ?{path:gm.SymbolPath.CIRCLE,scale:6,fillColor:item.color||'#fa3b74',fillOpacity:1,strokeColor:'#ffffff',strokeWeight:2}
             :{url:pinSvg(item.color||'#fa3b74'),scaledSize:new gm.Size(30,39),anchor:new gm.Point(15,38),labelOrigin:new gm.Point(15,-10)},
           label:isPhoto?null:{text:String(item.name||'').slice(0,28),className:'veo-gmap-label',color:'#ffffff',fontSize:'12px',fontWeight:'700'}
         });
-        const open=()=>{if(this.openKey===key)return;this.openKey=key;this.info.setContent(this.balloonHtml(item));this.info.open({map:this.map,anchor:marker})};
+        const show=()=>{if(this.openKey===key)return;this.openKey=key;this.info.setContent(this.balloonHtml(item));this.info.open({map:this.map,anchor:marker})};
+        // Si el pin está dentro de un grupo, acercar hasta que se separe y luego abrir su globo
+        const open=()=>{if(this.clusterer&&!marker.getMap()){this.map.panTo(marker.getPosition());this.map.setZoom(Math.max(this.map.getZoom()||0,17));gm.event.addListenerOnce(this.map,'idle',()=>setTimeout(show,120))}else show()};
         if(!isPhoto)this.byPredio.set(Number(item.id),open);
         if(hover)marker.addListener('mouseover',open);
         marker.addListener('click',open); // celular y laptop: el globo se abre; el expediente desde su botón
         this.markerObjs.push(marker);
+        if(MC&&!isPhoto)predioMarkers.push(marker);
+      }
+      if(MC&&predioMarkers.length){
+        this.clusterer=new MC.MarkerClusterer({map:this.map,markers:predioMarkers,
+          algorithm:new MC.SuperClusterAlgorithm({radius:72,maxZoom:15}),
+          renderer:{render:({count,position})=>{const ic=clusterSvg(count);return new gm.Marker({position,zIndex:1000+count,title:count+' predios · toca para acercar',
+            icon:{url:ic.url,scaledSize:new gm.Size(ic.d,ic.d),anchor:new gm.Point(ic.d/2,ic.d/2)},
+            label:{text:String(count),color:'#ffffff',fontSize:count<100?'14px':'12px',fontWeight:'800'}})}},
+          onClusterClick:(e,cluster,map)=>{this.userNavigated=true;this.closeInfo();if(cluster.bounds)map.fitBounds(cluster.bounds,{top:60,bottom:60,left:40,right:40});else{map.panTo(cluster.position);map.setZoom((map.getZoom()||12)+2)}}});
       }
     }
 
@@ -145,7 +161,7 @@
 
     remove(){
       this.destroyed=true;
-      try{this.info?.close();for(const m of this.markerObjs)m.setMap(null);for(const l of this.routeLines)l.setMap(null);this.gm.event.clearInstanceListeners(this.map);this.gm.event.clearInstanceListeners(this.info)}catch(_){}
+      try{this.info?.close();this.clusterer?.clearMarkers();this.clusterer?.setMap?.(null);for(const m of this.markerObjs)m.setMap(null);for(const l of this.routeLines)l.setMap(null);this.gm.event.clearInstanceListeners(this.map);this.gm.event.clearInstanceListeners(this.info)}catch(_){}
       this.el.removeEventListener('click',this._clickHandler);
       this.markerObjs=[];this.routeLines=[];
     }
