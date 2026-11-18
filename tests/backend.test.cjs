@@ -222,12 +222,11 @@ test('fase 5 EN OPERACIÓN: exige expediente de cierre completo y acepta fotos/v
   // Mecánica de suelos y documento de permiso municipal son opcionales: no se adjuntan y aun así se puede avanzar
   for (const [i, t] of ['contrato', 'memoria_calculo', 'factibilidad_electrica', 'programa_obra'].entries())
     db.veo_documents.push({ id: i + 1, predio_id: 1, doc_type: t, storage_path: `1/${t}.pdf` });
-  db.veo_predios[0].permiso_status = 'autorizado';
-  // Falta la evidencia fotográfica: todavía no se puede solicitar
+  // Falta el permiso autorizado: todavía no se puede solicitar
   det = await call('GET', 'predios/1', { cookie: b.cookie });
-  assert.deepEqual(det.data.next_requirements.filter(x => !x.done).map(x => x.label), ['Evidencia fotográfica']);
-  assert.equal((await call('POST', 'predios/1/request', { ...b, body: {} })).status, 400);
-  db.veo_documents.push({ id: 99, predio_id: 1, doc_type: 'evidencia_fotografica', storage_path: '1/obra.jpg' });
+  assert.deepEqual(det.data.next_requirements.filter(x => !x.done).map(x => x.label), ['Permiso municipal autorizado']);
+  assert.ok(det.data.next_requirements.some(x => x.label === 'Evidencia de programa de obra' && x.done));
+  db.veo_predios[0].permiso_status = 'autorizado';
   assert.equal((await call('POST', 'predios/1/request', { ...b, body: {} })).status, 200);
   const a = await loginAs('ana');
   const r = db.veo_requests[0];
