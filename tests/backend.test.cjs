@@ -300,6 +300,21 @@ test('fase 2 → 3 exige el recibo de pago del predial', async () => {
   assert.equal((await call('POST', 'predios/1/request', { ...b, body: {} })).status, 200);
 });
 
+test('mapa: en EN OPERACIÓN sólo fotos del predio y de operación; otras fases sin cambio', async () => {
+  const beto = await addUser('beto', 'broker');
+  db.veo_predios.push({ id: 1, code: 'VEO-01-00001', alias: 'Operando', broker_id: beto.id, created_by: beto.id, active: true, phase: 'EN_OPERACION', corridor_id: 1 },
+                      { id: 2, code: 'VEO-01-00002', alias: 'Buscando', broker_id: beto.id, created_by: beto.id, active: true, phase: 'BUSQUEDA_FACTIBILIDAD', corridor_id: 1 });
+  const geo = { geo_lat: 25.6, geo_lng: -100.3, geo_source: 'exif' };
+  let id = 0; const doc = (predio_id, doc_type, f) => db.veo_documents.push({ id: ++id, predio_id, doc_type, storage_path: `${predio_id}/${f}`, original_filename: f, ...geo });
+  doc(1, 'foto', 'predio.jpg'); doc(1, 'satelital', 'sat.png'); doc(1, 'dron', 'dron.mp4'); doc(1, 'operacion', 'pantalla.jpg'); doc(1, 'operacion', 'noche.mp4');
+  doc(2, 'foto', 'p2.jpg'); doc(2, 'satelital', 's2.png');
+  const { boot } = await loginAs('beto');
+  const p1 = boot.data.predios.find(p => p.id === 1), p2 = boot.data.predios.find(p => p.id === 2);
+  assert.deepEqual(p1.media.map(m => m.name).sort(), ['noche.mp4', 'pantalla.jpg', 'predio.jpg']);
+  assert.deepEqual(p2.media.map(m => m.name).sort(), ['p2.jpg', 's2.png']);
+  assert.deepEqual(boot.data.photos.filter(f => f.predio_id === 1).map(f => f.filename).sort(), ['noche.mp4', 'pantalla.jpg', 'predio.jpg']);
+});
+
 test('sólo admin crea usuarios; broker no exporta CSV', async () => {
   await addUser('ana', 'admin'); await addUser('beto', 'broker');
   const b = await loginAs('beto');

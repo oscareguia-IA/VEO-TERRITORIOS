@@ -160,9 +160,12 @@ async function handle(req,res){
   const docCols='id,predio_id,doc_type,storage_path,original_filename,uploaded_by_name,created_at,geo_lat,geo_lng,geo_source,taken_at';
   const [users,ps,documents,requests,activity]=await Promise.all([list('veo_users',{order:'id.asc'}),list('veo_predios',predioQuery),list('veo_documents',{select:docCols,limit:10000}),list('veo_requests',{order:'created_at.desc',limit:1000}),list('veo_activity',{order:'created_at.desc',limit:50})]);
   const visible=ps.filter(p=>p.active&&canSee(me,p));const ids=new Set(visible.map(p=>p.id));const names=Object.fromEntries(users.map(x=>[x.id,x.display_name]));
-  const media=mediaByPredio(documents);
+  // Mapa de oportunidades: en EN OPERACIÓN sólo se muestran 'Fotografía del predio' y 'Fotos / videos en operación'.
+  const phaseOf=new Map(visible.map(p=>[p.id,p.phase]));
+  const onMap=d=>phaseOf.get(d.predio_id)!=='EN_OPERACION'||['foto','operacion'].includes(d.doc_type);
+  const media=mediaByPredio(documents.filter(onMap));
   const docsCount=new Map(),pendingCount=new Map();for(const d of documents)docsCount.set(d.predio_id,(docsCount.get(d.predio_id)||0)+1);for(const r of requests)if(r.status==='pendiente')pendingCount.set(r.predio_id,(pendingCount.get(r.predio_id)||0)+1);
-  return {...result,maps_js_key:String(process.env.VEO_GOOGLE_MAPS_KEY||'').trim(),users:(mayManage(me)?users:users.filter(x=>x.active&&x.role==='broker')).map(safeUser),predios:visible.map(p=>({...p,broker_name:names[p.broker_id]||'Sin asignar',docs_count:docsCount.get(p.id)||0,media:media[p.id]||[],pending_count:pendingCount.get(p.id)||0})),requests:requests.filter(r=>ids.has(r.predio_id)),photos:documents.filter(d=>ids.has(d.predio_id)&&d.geo_lat!=null&&d.geo_lng!=null).map(d=>({id:d.id,predio_id:d.predio_id,lat:d.geo_lat,lng:d.geo_lng,source:d.geo_source,filename:d.original_filename,media:mediaKind(d)?[mediaItem(d)]:[],taken_at:d.taken_at||d.created_at})),activity:activity.filter(a=>a.predio_id==null||ids.has(a.predio_id)),corridors:null,weights:WEIGHTS};
+  return {...result,maps_js_key:String(process.env.VEO_GOOGLE_MAPS_KEY||'').trim(),users:(mayManage(me)?users:users.filter(x=>x.active&&x.role==='broker')).map(safeUser),predios:visible.map(p=>({...p,broker_name:names[p.broker_id]||'Sin asignar',docs_count:docsCount.get(p.id)||0,media:media[p.id]||[],pending_count:pendingCount.get(p.id)||0})),requests:requests.filter(r=>ids.has(r.predio_id)),photos:documents.filter(d=>ids.has(d.predio_id)&&onMap(d)&&d.geo_lat!=null&&d.geo_lng!=null).map(d=>({id:d.id,predio_id:d.predio_id,lat:d.geo_lat,lng:d.geo_lng,source:d.geo_source,filename:d.original_filename,media:mediaKind(d)?[mediaItem(d)]:[],taken_at:d.taken_at||d.created_at})),activity:activity.filter(a=>a.predio_id==null||ids.has(a.predio_id)),corridors:null,weights:WEIGHTS};
  }
  ensure(!me.must_change_password,'Debes cambiar la contraseña temporal antes de continuar.',403);
  if(key==='users'&&method==='POST'){
