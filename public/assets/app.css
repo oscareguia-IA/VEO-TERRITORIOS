@@ -932,3 +932,12 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
 .doc-type:has(input:checked)::before{border-color:#21cee5;background:radial-gradient(circle,#21cee5 0 4px,transparent 5px)}
 .doc-type:has(input:focus-visible){outline:2px solid #21cee5;outline-offset:2px}
 @media(max-width:700px){.doc-types{grid-template-columns:minmax(0,1fr)}}
+
+/* Visor de fotos del mapa: la imagen se ve completa y el visor se adapta a su orientación */
+.veo-gmap-track{align-items:flex-start;transition:height .25s ease}
+.veo-gmap-slide{min-height:90px;background:#0d2340}
+.veo-gmap-slide img,.veo-gmap-slide video{height:auto;max-height:340px;object-fit:contain;margin:0 auto}
+/* El globo de Google crece y se encoge con el visor en lugar de mostrar barra de desplazamiento */
+.gm-style .gm-style-iw-c{max-height:none!important}
+.gm-style .gm-style-iw-d{max-height:none!important;overflow:visible!important}
+@media(prefers-reduced-motion:reduce){.veo-gmap-track{transition:none}}

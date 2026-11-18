@@ -34,7 +34,7 @@
       // Botones dentro del globo (expediente, flechas del carrusel)
       this._clickHandler=e=>{
         const nav=e.target.closest?.('[data-veo-nav]');
-        if(nav){e.preventDefault();const track=nav.closest('.veo-gmap-media')?.querySelector('.veo-gmap-track');if(track)track.scrollBy({left:(nav.dataset.veoNav==='next'?1:-1)*track.clientWidth,behavior:'smooth'});return}
+        if(nav){e.preventDefault();const track=nav.closest('.veo-gmap-media')?.querySelector('.veo-gmap-track');if(track){track.scrollBy({left:(nav.dataset.veoNav==='next'?1:-1)*track.clientWidth,behavior:'smooth'});setTimeout(()=>track._veoFit?.(),420)}return}
         const b=e.target.closest?.('[data-veo-open]');
         if(b){e.preventDefault();this.closeInfo();this.onMarker?.(Number(b.dataset.veoOpen))}
       };
@@ -126,9 +126,16 @@
       const track=this.el.querySelector('.veo-gmap-info .veo-gmap-track');if(!track||track.dataset.wired)return;
       track.dataset.wired='1';
       const count=track.parentNode.querySelector('.veo-gmap-count'),total=track.children.length;
+      // El visor toma la altura de la foto/video que se está viendo: horizontal (16:9) más bajo,
+      // vertical (9:16) más alto, siempre mostrando la imagen completa.
+      const current=()=>Math.min(total-1,Math.max(0,Math.round(track.scrollLeft/Math.max(1,track.clientWidth))));
+      const fit=()=>{const s=track.children[current()];if(s&&s.offsetHeight)track.style.height=s.offsetHeight+'px'};
+      track.querySelectorAll('img').forEach(img=>{if(!img.complete)img.addEventListener('load',fit,{once:true});img.addEventListener('error',fit,{once:true})});
+      track.querySelectorAll('video').forEach(v=>v.addEventListener('loadedmetadata',fit,{once:true}));
+      requestAnimationFrame(fit);track._veoFit=fit;track.addEventListener('scrollend',fit,{passive:true});
       let t=null;
       track.addEventListener('scroll',()=>{clearTimeout(t);t=setTimeout(()=>{
-        const i=Math.round(track.scrollLeft/Math.max(1,track.clientWidth));
+        const i=current();fit();
         if(count)count.textContent=(i+1)+' / '+total;
         [...track.querySelectorAll('video')].forEach((v,idx)=>{if(v.closest('.veo-gmap-slide')!==track.children[i])v.pause()});
       },80)},{passive:true});
