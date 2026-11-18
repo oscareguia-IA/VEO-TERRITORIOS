@@ -169,6 +169,21 @@ test('al reasignar un predio, el broker que lo creó pierde el acceso', async ()
   assert.deepEqual(c.boot.data.predios.map(p => p.id), [1]);
 });
 
+test('predio registrado por broker queda a su nombre y no ve a otros brokers', async () => {
+  await addUser('ana', 'admin'); const beto = await addUser('beto', 'broker'); const caro = await addUser('caro', 'broker');
+  const { cookie, csrf, boot } = await loginAs('beto');
+  assert.deepEqual(boot.data.users.map(u => u.id), [beto.id], 'el broker sólo recibe su propia cuenta');
+  const r = await call('POST', 'predios', { cookie, csrf, body: { alias: 'Para Caro', corridor_id: 1, lat: 25.67, lng: -100.31, broker_id: caro.id } });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(db.veo_predios.find(p => p.alias === 'Para Caro').broker_id, beto.id, 'se ignora el broker enviado');
+  const r2 = await call('POST', 'predios', { cookie, csrf, body: { alias: 'Sin broker', corridor_id: 1, lat: 25.67, lng: -100.31, broker_id: null } });
+  assert.equal(db.veo_predios.find(p => p.id === r2.data.id).broker_id, beto.id);
+  assert.equal((await call('PATCH', `predios/${r2.data.id}`, { cookie, csrf, body: { alias: 'Sin broker', broker_id: caro.id } })).status, 200);
+  assert.equal(db.veo_predios.find(p => p.id === r2.data.id).broker_id, beto.id, 'el broker no puede reasignar');
+  const admin = await loginAs('ana');
+  assert.ok(admin.boot.data.users.length >= 3, 'supervisión sigue viendo a todo el equipo');
+});
+
 test('nuevo predio no se marca como verificado y ya no existe la revalidación', async () => {
   await addUser('beto', 'broker');
   const { cookie, csrf } = await loginAs('beto');
