@@ -214,6 +214,20 @@ test('foto de fase 1 se acepta sin georreferencia; si trae GPS se guarda', async
   assert.equal(db.veo_documents[1].geo_lat, 25.67);
 });
 
+test('los archivos se renombran según lo solicitado (foto_predio_1, recibo_predial_1…)', async () => {
+  const beto = await addUser('beto', 'broker');
+  db.veo_predios.push({ id: 1, code: 'VEO-01-00001', alias: 'Nombres', broker_id: beto.id, created_by: beto.id, active: true, phase: 'BUSQUEDA_FACTIBILIDAD', corridor_id: 1 });
+  const { cookie, csrf } = await loginAs('beto');
+  const up = (doc_type, f) => call('POST', 'predios/1/documents/complete', { cookie, csrf, body: { doc_type, storage_path: `1/${f}`, original_filename: f } });
+  assert.equal((await up('foto', 'WhatsApp Image 2026-11-18 at 10.15.32.jpeg')).status, 200);
+  await up('foto', 'IMG-20261118-WA0007.JPG');
+  await up('predial', 'WhatsApp Image 2026-11-18 at 11.00.00.png');
+  await up('operacion', 'VID-20261118-WA0001.mp4');
+  assert.deepEqual(db.veo_documents.map(d => d.original_filename), ['foto_predio_1.jpg', 'foto_predio_2.jpg', 'recibo_predial_1.png', 'operacion_1.mp4']);
+  const sign = await call('POST', 'predios/1/documents/sign', { cookie, csrf, body: { doc_type: 'foto', original_filename: 'WhatsApp Image.jpeg', size_bytes: 1000 } });
+  assert.doesNotMatch(sign.data.storage_path || '', /WhatsApp/);
+});
+
 test('fase 1 → contacto: el video con dron es opcional', async () => {
   const beto = await addUser('beto', 'broker');
   db.veo_predios.push({ id: 1, code: 'VEO-01-00001', alias: 'Sin dron', broker_id: beto.id, created_by: beto.id, active: true, phase: 'BUSQUEDA_FACTIBILIDAD', corridor_id: 1, lat: 25.67, lng: -100.31, score: 80, dron_url: null });

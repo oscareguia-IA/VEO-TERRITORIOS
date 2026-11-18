@@ -84,6 +84,9 @@ async function writeLimit(me,key,res){
 }
 function tooMany(res,secs){res.setHeader('Retry-After',String(secs));return codeError(429,`Demasiados intentos fallidos. Espera ${Math.ceil(secs/60)} minutos e inténtalo de nuevo.`)}
 // ── Georreferencia de fotografías ──
+// Nombre estándar del archivo según lo que se solicitó (p. ej. foto_predio_1.jpg), en vez del nombre de WhatsApp/cámara.
+const DOC_ABBR={foto:'foto_predio',satelital:'mapa_satelital',dron:'video_dron',carta_intencion:'carta_intencion',predial:'recibo_predial',contrato:'contrato',mecanica_suelos:'mecanica_suelos',memoria_calculo:'memoria_calculo',factibilidad_electrica:'factibilidad_electrica',permiso_municipal:'permiso_municipal',programa_obra:'programa_obra',operacion:'operacion',otro:'documento'};
+function standardName(type,original,docs){const m=/\.([a-z0-9]{1,5})$/i.exec(String(original||''));const ext=m?'.'+m[1].toLowerCase().replace('jpeg','jpg'):'';const base=DOC_ABBR[type]||'documento';const re=new RegExp('^'+base+'_(\\d+)(\\.|$)');let n=0;for(const d of docs){if(d.doc_type!==type)continue;const x=re.exec(String(d.original_filename||''));n=Math.max(n,x?+x[1]:0)}n=Math.max(n,docs.filter(d=>d.doc_type===type).length);return `${base}_${n+1}${ext}`}
 const DISPLAY_EXT=/\.(jpe?g|png|webp)$/i;
 const isDisplayPhoto=d=>d.doc_type==='foto'&&DISPLAY_EXT.test(String(d.original_filename||d.storage_path||''));
 const VIDEO_EXT=/\.(mp4|mov|m4v|webm)$/i;
@@ -228,7 +231,7 @@ async function handle(req,res){
   if(parts[2]==='request'&&method==='POST'){ensure(canEdit(me,p),'No puedes solicitar avance.',403);const to=PHASES[PHASES.indexOf(p.phase)+1];ensure(to,'El predio ya está en operación.');const docs=await list('veo_documents',{predio_id:`eq.${pid}`});const missing=reqItems(p,docs,to).filter(x=>!x.done).map(x=>x.label);ensure(!missing.length,'Faltan requisitos: '+missing.join('; '));const pending=await list('veo_requests',{predio_id:`eq.${pid}`,status:'eq.pendiente'});ensure(!pending.length,'Ya hay una solicitud pendiente.');await add('veo_requests',{predio_id:pid,from_phase:p.phase,to_phase:to,code:p.code,alias:p.alias,requester_name:me.display_name,reason:cleanText(b.reason,500)});await audit(me,pid,'solicitud',`Solicitó avance a ${to}`);return {ok:true}}
   if(parts[2]==='documents'&&parts[3]==='sign'&&method==='POST'){
    ensure(canEdit(me,p),'Sin permiso para adjuntar.',403);ensure(DOC_TYPES.has(b.doc_type),'Tipo documental no válido.');ensure(Number.isSafeInteger(b.size_bytes)&&b.size_bytes>0&&b.size_bytes<=MAX_FILE,'El archivo debe ser de máximo 45 MB.');
-   const filename=cleanText(b.original_filename,180).replace(/[^a-zA-Z0-9._-]/g,'_');const path=`${pid}/${crypto.randomUUID()}-${filename}`;
+   const filename=standardName(b.doc_type,b.original_filename,[]).replace(/_1(\.|$)/,'$1');const path=`${pid}/${crypto.randomUUID()}-${filename}`;
    const result=await storage('POST',`object/upload/sign/veo-documentos/${encodedPath(path)}`,{});
    return {url:signedLink(result,path,'upload/sign'),storage_path:path,filename};
   }
@@ -236,7 +239,8 @@ async function handle(req,res){
    ensure(canEdit(me,p),'Sin permiso para adjuntar.',403);ensure(DOC_TYPES.has(b.doc_type)&&typeof b.storage_path==='string'&&b.storage_path.startsWith(`${pid}/`)&&b.storage_path.length<400,'Archivo inválido.');const geo=docGeo(b);
    const exists=await list('veo_documents',{storage_path:`eq.${b.storage_path}`,limit:1});ensure(!exists.length,'Archivo previamente registrado.');
    const info=await storage('GET',`object/info/veo-documentos/${encodedPath(b.storage_path)}`);const size=Number(info?.metadata?.size||info?.size||0);ensure(size>0&&size<=MAX_FILE,'No se localizó el archivo cargado o supera el límite.');
-   await add('veo_documents',{predio_id:pid,doc_type:b.doc_type,storage_path:b.storage_path,original_filename:cleanText(b.original_filename,180),size_bytes:size,uploaded_by_name:me.display_name,...geo});await audit(me,pid,'documento',`Adjuntó ${b.doc_type}`);return{ok:true};
+   const prior=await list('veo_documents',{predio_id:`eq.${pid}`,select:'doc_type,original_filename'});
+   await add('veo_documents',{predio_id:pid,doc_type:b.doc_type,storage_path:b.storage_path,original_filename:standardName(b.doc_type,b.original_filename,prior),size_bytes:size,uploaded_by_name:me.display_name,...geo});await audit(me,pid,'documento',`Adjuntó ${b.doc_type}`);return{ok:true};
   }
  }
  if(parts[0]==='requests'&&parts[2]==='resolve'&&method==='POST'){
