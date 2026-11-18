@@ -14,6 +14,7 @@ const PHASES=['BUSQUEDA_FACTIBILIDAD','PRIMER_CONTACTO','SEGUIMIENTO','CIERRE','
 const LAST_PHASE=PHASES[PHASES.length-1];
 const PHASE_LABEL={BUSQUEDA_FACTIBILIDAD:'Búsqueda / Factibilidad',PRIMER_CONTACTO:'Primer contacto',SEGUIMIENTO:'Seguimiento',CIERRE:'Cierre',EN_OPERACION:'En operación'};
 const WEIGHTS={flujo:45,visibilidad:25,electrica:10,propietario:10,comercial:10};
+const CORRIDOR_MAX=15; // 15 = Av. Manuel L. Barragán (agregado nov. 2026)
 const DOC_TYPES=new Set(['foto','satelital','dron','carta_intencion','predial','contrato','mecanica_suelos','memoria_calculo','factibilidad_electrica','permiso_municipal','programa_obra','operacion','otro']);
 const ROLES=new Set(['admin','supervisor','broker','legal','tecnico']);
 const COOKIE='veo_sesion', SECONDS=7*24*60*60, MAX_FILE=45*1024*1024;
@@ -135,7 +136,7 @@ async function storage(method,path,body=null){const {url}=env();const h=apiHeade
 const encodedPath=p=>p.split('/').map(encodeURIComponent).join('/');
 const signedLink=(data,path,kind)=>{const token=new URL(data.url||data.signedURL||'','https://supabase.invalid').searchParams.get('token');ensure(token,'No fue posible firmar el archivo.',502);return `${env().url}/storage/v1/object/${kind}/veo-documentos/${encodedPath(path)}?token=${encodeURIComponent(token)}`};
 async function validateGeo(id,point){
- const lat=+point.lat,lng=+point.lng;ensure(id>=1&&id<=14&&Number.isFinite(lat)&&Number.isFinite(lng),'Coordenadas inválidas.');
+ const lat=+point.lat,lng=+point.lng;ensure(id>=1&&id<=CORRIDOR_MAX&&Number.isFinite(lat)&&Number.isFinite(lng),'Coordenadas inválidas.');
  return {ok:true,status:'ok',message:'Ubicación registrada.'}; // verificación de corredor (Overpass) desactivada a petición del cliente 2026-11-15; versión anterior en el historial git
 }
 async function handle(req,res){
@@ -195,7 +196,7 @@ async function handle(req,res){
  if(key==='archives'&&method==='GET'){ensure(mayManage(me),'Sólo supervisión puede consultar archivos.',403);const [ps,users]=await Promise.all([list('veo_predios',{active:'eq.false',limit:2000}),list('veo_users')]);const names=Object.fromEntries(users.map(x=>[x.id,x.display_name]));return {predios:ps.map(p=>({...p,broker_name:names[p.broker_id]||'—'}))}}
  if(key==='geo/validate'&&method==='POST')return validateGeo(+b.corridor_id,{lat:b.lat,lng:b.lng});
  if(key==='predios'&&method==='POST'){
-  ensure(b.alias&&+b.corridor_id>=1&&+b.corridor_id<=14&&b.lat!=null&&b.lng!=null,'Completa alias, corredor y pin GPS.');
+  ensure(b.alias&&+b.corridor_id>=1&&+b.corridor_id<=CORRIDOR_MAX&&b.lat!=null&&b.lng!=null,'Completa alias, corredor y pin GPS.');
   const geo=await validateGeo(+b.corridor_id,{lat:b.lat,lng:b.lng});ensure(geo.status!=='outside',geo.message);
   const broker=me.role==='broker'?me.id:(b.broker_id?+b.broker_id:null);
   if(broker){const assigned=await one('veo_users',{id:`eq.${broker}`});ensure(assigned?.active&&assigned.role==='broker','Selecciona un broker activo.')}
