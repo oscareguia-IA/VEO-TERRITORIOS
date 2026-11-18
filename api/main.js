@@ -14,7 +14,7 @@ const PHASES=['BUSQUEDA_FACTIBILIDAD','PRIMER_CONTACTO','SEGUIMIENTO','CIERRE','
 const LAST_PHASE=PHASES[PHASES.length-1];
 const PHASE_LABEL={BUSQUEDA_FACTIBILIDAD:'Búsqueda / Factibilidad',PRIMER_CONTACTO:'Primer contacto',SEGUIMIENTO:'Seguimiento',CIERRE:'Cierre',EN_OPERACION:'En operación'};
 const WEIGHTS={flujo:45,visibilidad:25,electrica:10,propietario:10,comercial:10};
-const DOC_TYPES=new Set(['foto','satelital','dron','carta_intencion','predial','contrato','mecanica_suelos','memoria_calculo','factibilidad_electrica','permiso_municipal','operacion','otro']);
+const DOC_TYPES=new Set(['foto','satelital','dron','carta_intencion','predial','contrato','mecanica_suelos','memoria_calculo','factibilidad_electrica','permiso_municipal','programa_obra','evidencia_fotografica','operacion','otro']);
 const ROLES=new Set(['admin','supervisor','broker','legal','tecnico']);
 const COOKIE='veo_sesion', SECONDS=7*24*60*60, MAX_FILE=45*1024*1024;
 const codeError=(status,detail)=>Object.assign(new Error(detail),{status});
@@ -67,7 +67,7 @@ const reqItems=(p,docs,to)=>{const found=t=>docs.some(x=>x.doc_type===t),items=[
  if(to==='EN_OPERACION')for(const it of readiness(p,docs).items)push(it.label,it.done);return items;
 };
 // Mecánica de suelos y el documento de permiso municipal son opcionales (se pueden adjuntar, pero no bloquean la operación).
-function readiness(p,docs){const x=[['contrato','Contrato firmado / condicionado'],['memoria_calculo','Memoria de cálculo estructural'],['factibilidad_electrica','Factibilidad eléctrica']].map(([key,label])=>({key,label,done:docs.some(d=>d.doc_type===key)}));x.push({key:'permiso',label:'Permiso municipal autorizado',done:p.permiso_status==='autorizado'},{key:'clausula',label:'Cláusula suspensiva reconocida',done:!!p.clausula_condicional});return {complete:['CIERRE','EN_OPERACION'].includes(p.phase)&&x.every(q=>q.done),items:x}}
+function readiness(p,docs){const x=[['contrato','Contrato firmado / condicionado'],['memoria_calculo','Memoria de cálculo estructural'],['factibilidad_electrica','Factibilidad eléctrica'],['programa_obra','Evidencia de programa de obra'],['evidencia_fotografica','Evidencia fotográfica']].map(([key,label])=>({key,label,done:docs.some(d=>d.doc_type===key)}));x.push({key:'permiso',label:'Permiso municipal autorizado',done:p.permiso_status==='autorizado'},{key:'clausula',label:'Cláusula suspensiva reconocida',done:!!p.clausula_condicional});return {complete:['CIERRE','EN_OPERACION'].includes(p.phase)&&x.every(q=>q.done),items:x}}
 // ── Límite de intentos (anti fuerza bruta) ──
 const LOGIN_USER_MAX=5, LOGIN_IP_MAX=20, LOGIN_WINDOW_S=900, LOGIN_LOCK_S=900;
 const DUMMY_HASH='scrypt$00000000000000000000000000000000000000$'+'0'.repeat(128);
@@ -87,7 +87,7 @@ function tooMany(res,secs){res.setHeader('Retry-After',String(secs));return code
 const DISPLAY_EXT=/\.(jpe?g|png|webp)$/i;
 const isDisplayPhoto=d=>d.doc_type==='foto'&&DISPLAY_EXT.test(String(d.original_filename||d.storage_path||''));
 const VIDEO_EXT=/\.(mp4|mov|m4v|webm)$/i;
-const mediaKind=d=>{const n=String(d.original_filename||d.storage_path||'');if(VIDEO_EXT.test(n))return 'video';if(['foto','satelital','dron','operacion'].includes(d.doc_type)&&DISPLAY_EXT.test(n))return 'img';return null};
+const mediaKind=d=>{const n=String(d.original_filename||d.storage_path||'');if(VIDEO_EXT.test(n))return 'video';if(['foto','satelital','dron','evidencia_fotografica','operacion'].includes(d.doc_type)&&DISPLAY_EXT.test(n))return 'img';return null};
 const mediaItem=d=>({id:d.id,kind:mediaKind(d),by:d.uploaded_by_name||'',at:d.taken_at||d.created_at,name:d.original_filename||''});
 function mediaByPredio(documents){const m={};for(const d of documents){if(!mediaKind(d))continue;(m[d.predio_id]=m[d.predio_id]||[]).push(d)}for(const k in m)m[k]=m[k].sort((a,b)=>b.id-a.id).slice(0,12).map(mediaItem);return m}
 function docGeo(b){
