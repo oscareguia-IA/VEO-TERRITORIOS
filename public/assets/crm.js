@@ -143,6 +143,7 @@ async function loadAll(){
  const data=await api('/api/bootstrap');if(!data.corridors)data.corridors=window.VEO_DEMO_CORRIDORS||[];state.data=data;state.user=data.user;state.csrf=data.csrf;
  if(data.must_change_password||data.user?.must_change_password){passwordChangeScreen(true);return}
  shell.classList.remove('hidden');loginRoot.innerHTML='';render();
+ const gk=googleMapsJSKey();if(gk&&window.VEOGoogleMap)setTimeout(()=>loadGoogleMapsJS(gk).catch(()=>{}),state.view==='mapa'?0:1200);
 }
 async function refresh(reopen=false){const current=state.drawer?.predio?.id;const tab=state.drawerTab;await loadAll();if(reopen&&current){await openPredio(current,tab)}}
 function loginScreen(){state.user=null;shell.classList.add('hidden');document.getElementById('drawer').innerHTML='';loginRoot.innerHTML=`<div class="auth-wrap"><div class="auth-card login-card"><img class="login-logo" src="${DEMO_LOGO}" alt="Logotipo VEO" /><div class="page-kicker">VEO TERRITORIOS</div><h1>Iniciar sesión</h1><p class="login-subtitle">Accede a tu espacio VEO TERRITORIOS</p><form data-form="login"><div class="field-group"><label class="field-label" for="veo-login-username">Usuario</label><input id="veo-login-username" name="username" class="field" autocomplete="username" required placeholder="Nombre de usuario" /></div><div class="field-group"><label class="field-label" for="veo-login-password">Contraseña</label><input id="veo-login-password" name="password" type="password" class="field" autocomplete="current-password" required placeholder="Contraseña" /></div><label class="auth-show-password"><input type="checkbox" data-toggle-password aria-label="Mostrar contraseña" /><span>Mostrar contraseña</span></label><button class="btn btn-primary" type="submit">ENTRAR AL CRM</button></form><p class="login-footnote">Acceso autorizado VEO</p>${hasLocalDemoData()?'<button type="button" class="btn btn-ghost small mt12" data-action="export-local-backup">RESPALDAR DATOS ANTERIORES DE ESTE DISPOSITIVO</button>':''}</div></div>`}
@@ -326,6 +327,7 @@ async function initMap(){const el=document.getElementById('opportunities-map');i
  highlightOpportunityCorridor(state.map,state.selectedCorridor);
 }
 window.veoOpen=id=>openPredio(id);
+window.veoReloadMap=()=>{if(state.view==='mapa')initMap()};
 function setTileLayer(){if(state.map?.setMode)state.map.setMode('streets')}
 async function searchNode(id){const c=corridor(id);if(!c||!state.map)return;let view=CORRIDOR_FOCUS?.[id];if(view){state.map.flyTo([view[0],view[1]],view[2]);toast('Ubicación orientativa del corredor; no representa un predio.')}else toast('No se encontró el sector de referencia.',true)}
 let aforoZoomActual=100;
@@ -520,7 +522,7 @@ function loadGoogleMapsJS(key){
   const script=document.createElement('script');script.async=true;script.defer=true;
   script.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(key)+'&loading=async&v=weekly&callback='+callback+'&language=es&region=MX';
   script.onerror=()=>finish(new Error('No se pudo cargar Google Maps. Comprueba la clave, facturación y los dominios autorizados.'));
-  const timeout=setTimeout(()=>finish(new Error('Google Maps no respondió.')),11000);
+  const timeout=setTimeout(()=>finish(new Error('Google Maps no respondió.')),20000);
   document.head.appendChild(script);
  });
  return googleMapLoader;

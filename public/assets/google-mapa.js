@@ -42,6 +42,35 @@
       };
       el.addEventListener('click',this._clickHandler);
       this.setMarkers(markers);
+      this.watchTiles();
+    }
+
+    // Vigilancia de la cartografía: si los mosaicos no terminan de cargar (red móvil lenta,
+    // pestaña en segundo plano, cambio de tamaño), se piden de nuevo; si aun así no llegan,
+    // se muestra un botón para recargar sólo el mapa.
+    watchTiles(){
+      const gm=this.gm;this.tilesOk=false;this._tries=0;
+      const ok=()=>{this.tilesOk=true;clearTimeout(this._tileTimer);this.el.querySelector('.veo-gmap-retry')?.remove()};
+      const pending=()=>{if(this.destroyed)return;this.tilesOk=false;clearTimeout(this._tileTimer);this._tileTimer=setTimeout(check,6000)};
+      const drawn=()=>[...this.el.querySelectorAll('.gm-style img')].some(i=>i.complete&&i.naturalWidth>=256);
+      const check=()=>{if(this.destroyed||this.tilesOk)return;if(drawn()){ok();return}
+        if(this._tries<2){this._tries++;this.nudge();this._tileTimer=setTimeout(check,6000);return}
+        this.showRetry()};
+      this.map.addListener('tilesloaded',ok);
+      this.map.addListener('zoom_changed',pending);
+      this._onWake=()=>{if(document.visibilityState!=='hidden'&&!this.tilesOk&&!this.destroyed){this._tries=0;this.nudge();pending()}};
+      document.addEventListener('visibilitychange',this._onWake);window.addEventListener('online',this._onWake);
+      this._resizeObs=window.ResizeObserver?new ResizeObserver(()=>{if(!this.destroyed)this.nudge()}):null;this._resizeObs?.observe(this.el);
+      pending();
+    }
+    nudge(){ // vuelve a solicitar los mosaicos visibles sin mover el mapa de forma perceptible
+      const c=this.map?.getCenter();if(!c)return;this.map.panBy(0,1);this.map.panBy(0,-1);this.map.setCenter(c)
+    }
+    showRetry(){
+      if(this.el.querySelector('.veo-gmap-retry'))return;
+      const b=document.createElement('button');b.type='button';b.className='veo-gmap-retry';b.textContent='↻ Recargar cartografía';
+      b.addEventListener('click',e=>{e.stopPropagation();b.remove();(window.veoReloadMap||(()=>{this._tries=0;this.nudge()}))()});
+      this.el.appendChild(b);
     }
 
     bounds({south,west,north,east}){return new this.gm.LatLngBounds({lat:south,lng:west},{lat:north,lng:east})}
@@ -160,7 +189,7 @@
     setMode(){this.map?.setMapTypeId('roadmap')} // siempre calles
 
     remove(){
-      this.destroyed=true;
+      this.destroyed=true;clearTimeout(this._tileTimer);this._resizeObs?.disconnect();document.removeEventListener('visibilitychange',this._onWake);window.removeEventListener('online',this._onWake);
       try{this.info?.close();this.clusterer?.clearMarkers();this.clusterer?.setMap?.(null);for(const m of this.markerObjs)m.setMap(null);for(const l of this.routeLines)l.setMap(null);this.gm.event.clearInstanceListeners(this.map);this.gm.event.clearInstanceListeners(this.info)}catch(_){}
       this.el.removeEventListener('click',this._clickHandler);
       this.markerObjs=[];this.routeLines=[];

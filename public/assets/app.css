@@ -941,3 +941,6 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
 .gm-style .gm-style-iw-c{max-height:none!important}
 .gm-style .gm-style-iw-d{max-height:none!important;overflow:visible!important}
 @media(prefers-reduced-motion:reduce){.veo-gmap-track{transition:none}}
+
+/* Mapa de oportunidades: botón para volver a pedir la cartografía si no cargó */
+.veo-gmap-retry{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:30;background:#fa3b74;color:#fff;border:0;border-radius:999px;padding:12px 20px;font-weight:700;font-size:14px;box-shadow:0 8px 24px #0006;cursor:pointer}
