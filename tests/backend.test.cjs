@@ -125,6 +125,24 @@ test('sin cookie no hay acceso; sesión revocada al subir session_version', asyn
   assert.equal((await call('GET', 'bootstrap', { cookie })).status, 401);
 });
 
+test('la sesión vence tras 15 minutos sin actividad y cada petición la renueva', async () => {
+  const t = signedSession({ id: 7, session_version: 2 });
+  const d = decodeSession(t);
+  assert.ok(d.exp - Date.now() <= 15 * 60 * 1000 + 1000, 'vigencia máxima de 15 min por inactividad');
+  const viejo = signedSession({ id: 7, session_version: 2 }, Date.now() - 8 * 24 * 3600 * 1000);
+  assert.equal(decodeSession(viejo), null, 'tope absoluto de 7 días desde el inicio de sesión');
+  await addUser('ana', 'admin');
+  const { cookie, csrf } = await loginAs('ana');
+  const ping = await call('GET', 'ping', { cookie });
+  assert.equal(ping.status, 200);
+  const renovada = ping.headers['set-cookie'];
+  assert.match(renovada || '', /veo_sesion=/, 'la actividad renueva la cookie');
+  const cookie2 = renovada.split(';')[0];
+  const boot2 = await call('GET', 'bootstrap', { cookie: cookie2 });
+  assert.equal(boot2.data.csrf, csrf, 'el token CSRF no cambia al renovar la sesión');
+  assert.equal((await call('POST', 'logout', { cookie: cookie2, csrf })).status, 200);
+});
+
 test('bootstrap nunca expone password_hash', async () => {
   await addUser('ana', 'admin'); await addUser('beto', 'broker');
   const { boot } = await loginAs('ana');

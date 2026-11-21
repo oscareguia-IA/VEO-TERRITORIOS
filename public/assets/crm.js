@@ -142,7 +142,7 @@ async function api(path,options={}){
 async function loadAll(){
  const data=await api('/api/bootstrap');if(!data.corridors)data.corridors=window.VEO_DEMO_CORRIDORS||[];state.data=data;state.user=data.user;state.csrf=data.csrf;
  if(data.must_change_password||data.user?.must_change_password){passwordChangeScreen(true);return}
- shell.classList.remove('hidden');loginRoot.innerHTML='';render();
+ shell.classList.remove('hidden');loginRoot.innerHTML='';render();window.veoIdleReset?.();
  const gk=googleMapsJSKey();if(gk&&window.VEOGoogleMap)setTimeout(()=>loadGoogleMapsJS(gk).catch(()=>{}),state.view==='mapa'?0:1200);
 }
 async function refresh(reopen=false){const current=state.drawer?.predio?.id;const tab=state.drawerTab;await loadAll();if(reopen&&current){await openPredio(current,tab)}}
@@ -806,6 +806,28 @@ document.addEventListener('focusin',ev=>{
  if(ev.target?.id==='picker-corridor-query')pickerCorridorOptions(ev.target.value.replace(/^\d{2}\s*·\s*/,''));
 });
 document.addEventListener('submit',async ev=>{const form=ev.target.closest('form[data-form]');if(!form)return;ev.preventDefault();const btn=form.querySelector('[type="submit"]');if(btn){btn.disabled=true;btn.dataset.old=btn.textContent;btn.textContent='PROCESANDO…'}try{await forms(form)}catch(e){toast(e.message,true);if(btn){btn.disabled=false;btn.textContent=btn.dataset.old}}});
+// Cierre de sesión por inactividad: 15 minutos sin tocar, escribir ni desplazarse.
+// El servidor aplica el mismo límite (la cookie se renueva en cada petición y con /api/ping).
+(function(){
+ const IDLE=15*60*1000,PING=4*60*1000;let last=Date.now(),lastPing=Date.now(),timer=null;
+ const active=()=>!!state.user&&!shell.classList.contains('hidden');
+ async function expire(){
+  clearTimeout(timer);if(!active())return;
+  try{await fetch('/api/logout',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':state.csrf},body:'{}',credentials:'same-origin'})}catch(_){}
+  try{closeMap();document.getElementById('modal').innerHTML='';document.getElementById('location-picker').innerHTML='';closeDrawer()}catch(_){}
+  loginScreen();toast('Sesión cerrada tras 15 minutos de inactividad. Vuelve a iniciar sesión.',true);
+ }
+ function arm(){clearTimeout(timer);timer=setTimeout(check,Math.max(1000,IDLE-(Date.now()-last)))}
+ function check(){if(!active())return;if(Date.now()-last>=IDLE){expire();return}arm()}
+ function poke(){
+  if(!active())return;const now=Date.now();if(now-last>=IDLE){expire();return}
+  last=now;if(!timer)arm();
+  if(now-lastPing>PING){lastPing=now;fetch('/api/ping',{credentials:'same-origin'}).then(r=>{if(r.status===401)loginScreen()}).catch(()=>{})}
+ }
+ ['pointerdown','keydown','wheel','touchstart','scroll','mousemove'].forEach(e=>window.addEventListener(e,poke,{passive:true,capture:true}));
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')check()});
+ window.veoIdleReset=()=>{last=lastPing=Date.now();arm()};
+})();
 (async()=>{try{await loadAll()}catch(err){console.warn('Sesión no disponible:',err.message);loginScreen()}})();
 
 

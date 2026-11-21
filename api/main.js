@@ -17,7 +17,7 @@ const WEIGHTS={flujo:45,visibilidad:25,electrica:10,propietario:10,comercial:10}
 const CORRIDOR_MAX=15; // 15 = Av. Manuel L. Barragán (agregado nov. 2026)
 const DOC_TYPES=new Set(['foto','satelital','dron','carta_intencion','predial','contrato','mecanica_suelos','memoria_calculo','factibilidad_electrica','permiso_municipal','programa_obra','operacion','otro']);
 const ROLES=new Set(['admin','supervisor','broker','legal','tecnico']);
-const COOKIE='veo_sesion', SECONDS=7*24*60*60, MAX_FILE=45*1024*1024;
+const COOKIE='veo_sesion', SECONDS=7*24*60*60, IDLE_MS=15*60*1000, MAX_FILE=45*1024*1024;
 const codeError=(status,detail)=>Object.assign(new Error(detail),{status});
 const ensure=(ok,msg,status=400)=>{if(!ok)throw codeError(status,msg)};
 const env=()=>{
@@ -46,10 +46,10 @@ const safeUser=u=>{const {password_hash,session_version,...safe}=u;return safe};
 async function hashPassword(password){const salt=crypto.randomBytes(20).toString('hex');const hash=await scrypt(String(password),salt,64);return `scrypt$${salt}$${hash.toString('hex')}`}
 async function checkPassword(password,stored){try{const [method,salt,hex]=stored.split('$');if(method!=='scrypt')return false;const storedBuf=Buffer.from(hex,'hex');const actual=await scrypt(String(password),salt,storedBuf.length);return crypto.timingSafeEqual(storedBuf,actual)}catch(_){return false}}
 const mac=(value)=>crypto.createHmac('sha256',env().secret).update(value).digest('base64url');
-function signedSession(user){const data=Buffer.from(JSON.stringify({sub:user.id,sv:user.session_version,exp:Date.now()+SECONDS*1000})).toString('base64url');return data+'.'+mac(data)}
+function signedSession(user,iat=Date.now()){const now=Date.now();const data=Buffer.from(JSON.stringify({sub:user.id,sv:user.session_version,iat,exp:Math.min(now+IDLE_MS,iat+SECONDS*1000)})).toString('base64url');return data+'.'+mac(data)}
 function decodeSession(token){try{const [b,signature]=token.split('.');if(!b||!signature||!crypto.timingSafeEqual(Buffer.from(signature),Buffer.from(mac(b))))return null;const d=JSON.parse(Buffer.from(b,'base64url').toString());return d.exp>Date.now()?d:null}catch(_){return null}}
 const getCookie=(req,key)=>{const s=String(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(key+'='));return s?decodeURIComponent(s.slice(key.length+1)):null};
-const setSession=(res,user)=>{const token=signedSession(user);res.setHeader('Set-Cookie',`${COOKIE}=${encodeURIComponent(token)}; Path=/; Max-Age=${SECONDS}; HttpOnly; Secure; SameSite=Lax`);return token};
+const setSession=(res,user,iat)=>{const token=signedSession(user,iat);res.setHeader('Set-Cookie',`${COOKIE}=${encodeURIComponent(token)}; Path=/; Max-Age=${SECONDS}; HttpOnly; Secure; SameSite=Lax`);return token};
 const clearSession=res=>res.setHeader('Set-Cookie',`${COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`);
 function send(res,status,obj){res.statusCode=status;res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify(obj))}
 const audit=(me,predio_id,kind,detail)=>add('veo_activity',{predio_id:predio_id||null,user_id:me.id,user_name:me.display_name,kind,detail});
@@ -129,7 +129,10 @@ async function login(body,res,req){
 }
 async function session(req,res){const token=getCookie(req,COOKIE),sess=token&&decodeSession(token);ensure(sess,'Inicia sesión.',401);
  const u=await one('veo_users',{id:`eq.${Number(sess.sub)}`});ensure(u&&u.active&&u.session_version===sess.sv,'Sesión inválida o cuenta desactivada.',401);
- return {u,csrf:mac('csrf:'+token)};
+ // Cada petición autenticada renueva los 15 minutos de inactividad. El CSRF depende del inicio de
+ // sesión (no del token), así que no cambia al renovarse la cookie.
+ setSession(res,u,sess.iat||Date.now());
+ return {u,csrf:mac(`csrf:${u.id}:${u.session_version}:${sess.iat||token}`)};
 }
 function validateOrigin(req){const origin=req.headers.origin;if(origin){const forwarded=req.headers['x-forwarded-host']||req.headers.host;const expected=`https://${forwarded}`;ensure(origin===expected,'Origen de solicitud no permitido.',403)} }
 async function storage(method,path,body=null){const {url}=env();const h=apiHeaders();if(body!==null)h['Content-Type']='application/json';const r=await fetch(url+'/storage/v1/'+path,{method,headers:h,body:body===null?undefined:JSON.stringify(body),signal:AbortSignal.timeout(20000)});const data=await r.json().catch(()=>({}));if(!r.ok){console.error('Storage',r.status,data?.statusCode);throw codeError(502,'No se pudo acceder al almacenamiento privado de archivos.')}return data}
@@ -151,6 +154,7 @@ async function handle(req,res){
  if(method!=='GET')await writeLimit(me,key,res);
  const b=req.body||{};
  if(key==='logout'&&method==='POST'){clearSession(res);return {ok:true}}
+ if(key==='ping'&&method==='GET')return {ok:true,idle_minutes:IDLE_MS/60000};
  if(key==='me/password'&&method==='POST'){
   ensure(await checkPassword(b.current_password,me.password_hash),'La contraseña actual no coincide.');ensure(typeof b.new_password==='string'&&b.new_password.length>=7&&b.new_password.length<=128,'Contraseña nueva: entre 7 y 128 caracteres.');ensure(b.new_password!==b.current_password,'La nueva contraseña debe ser diferente.');
   await patch('veo_users',me.id,{password_hash:await hashPassword(b.new_password),must_change_password:false,password_changed_at:new Date().toISOString(),credential_updated_at:new Date().toISOString(),session_version:me.session_version+1});
