@@ -1003,3 +1003,12 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
 .quickflow .phase-card-3 .flow-count{color:#ffc06d}
 .quickflow .phase-card-4 .flow-count{color:#ff6b9b}
 .quickflow .phase-card-5 .flow-count{color:#3ddc97}
+/* Inicio: todo el texto «N predios en etapa» más grande, en bold y con el color de la fase */
+.quickflow .phase-card .flow-text small{display:block;margin-top:4px;font-size:15px;font-weight:800;line-height:1.25;letter-spacing:.1px}
+.quickflow .phase-card .flow-count{font-size:1.9em}
+.quickflow .phase-card-1 .flow-text small{color:#2ed3df}
+.quickflow .phase-card-2 .flow-text small{color:#c3a4ff}
+.quickflow .phase-card-3 .flow-text small{color:#ffc06d}
+.quickflow .phase-card-4 .flow-text small{color:#ff6b9b}
+.quickflow .phase-card-5 .flow-text small{color:#3ddc97}
+@media (max-width:720px){.quickflow .phase-card .flow-text small{font-size:14px}}
