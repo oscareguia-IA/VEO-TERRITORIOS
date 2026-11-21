@@ -60,7 +60,7 @@
       this.map.addListener('zoom_changed',pending);
       this._onWake=()=>{if(document.visibilityState!=='hidden'&&!this.tilesOk&&!this.destroyed){this._tries=0;this.nudge();pending()}};
       document.addEventListener('visibilitychange',this._onWake);window.addEventListener('online',this._onWake);
-      this._resizeObs=window.ResizeObserver?new ResizeObserver(()=>{if(!this.destroyed)this.nudge()}):null;this._resizeObs?.observe(this.el);
+      this._resizeObs=window.ResizeObserver?new ResizeObserver(()=>{if(!this.destroyed){this.nudge();this.sizeMedia()}}):null;this._resizeObs?.observe(this.el);
       pending();
     }
     nudge(){ // vuelve a solicitar los mosaicos visibles sin mover el mapa de forma perceptible
@@ -174,7 +174,8 @@
       // El visor toma la altura de la foto/video que se está viendo: horizontal (16:9) más bajo,
       // vertical (9:16) más alto, siempre mostrando la imagen completa.
       const current=()=>Math.min(total-1,Math.max(0,Math.round(track.scrollLeft/Math.max(1,track.clientWidth))));
-      const fit=()=>{const s=track.children[current()];if(s&&s.offsetHeight)track.style.height=s.offsetHeight+'px'};
+      this.sizeMedia();
+      const fit=()=>{const s=track.children[current()];if(s&&s.offsetHeight){track.style.height=s.offsetHeight+'px'}};
       track.querySelectorAll('img').forEach(img=>{if(!img.complete)img.addEventListener('load',fit,{once:true});img.addEventListener('error',fit,{once:true})});
       track.querySelectorAll('video').forEach(v=>v.addEventListener('loadedmetadata',fit,{once:true}));
       requestAnimationFrame(fit);track._veoFit=fit;track.addEventListener('scrollend',fit,{passive:true});
@@ -186,6 +187,12 @@
       },80)},{passive:true});
     }
 
+    // Alto máximo de la foto/video del globo según el espacio real del mapa: en celular el mapa
+    // mide ~400 px, así que una foto vertical no puede usar 340 px más el título y los botones.
+    sizeMedia(){
+      const h=this.el.clientHeight||0;const max=Math.max(120,Math.min(340,h-215));
+      this.el.style.setProperty('--veo-gm-media-max',max+'px');
+    }
     setMode(){this.map?.setMapTypeId('roadmap')} // siempre calles
 
     remove(){
