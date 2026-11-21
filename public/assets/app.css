@@ -995,3 +995,11 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
 /* Registrar predio: la ubicación se marca sólo desde el mapa (un solo botón) */
 .location-callout-label{display:block;margin:16px 0 8px}
 .create-predio-modal .location-callout-label+.location-callout{margin-top:0}
+
+/* Inicio: cantidad de predios por etapa más grande y con el color de la fase */
+.quickflow .phase-card .flow-count{font-family:'Space Grotesk',sans-serif;font-size:2.1em;font-weight:800;line-height:1;margin-right:3px;vertical-align:-0.12em;letter-spacing:-.5px}
+.quickflow .phase-card-1 .flow-count{color:#2ed3df}
+.quickflow .phase-card-2 .flow-count{color:#c3a4ff}
+.quickflow .phase-card-3 .flow-count{color:#ffc06d}
+.quickflow .phase-card-4 .flow-count{color:#ff6b9b}
+.quickflow .phase-card-5 .flow-count{color:#3ddc97}
