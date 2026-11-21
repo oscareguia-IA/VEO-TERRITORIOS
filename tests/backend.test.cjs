@@ -280,7 +280,7 @@ test('fase 1 → contacto: el video con dron es opcional', async () => {
   assert.equal(r.status, 200, JSON.stringify(r.data));
 });
 
-test('fase 5 EN OPERACIÓN: exige expediente de cierre completo y acepta fotos/videos de operación', async () => {
+test('fase 5 EN OPERACIÓN: exige expediente de cierre completo; luego fotos/videos de operación sólo con desbloqueo', async () => {
   await addUser('ana', 'admin'); const beto = await addUser('beto', 'broker');
   db.veo_predios.push({ id: 1, code: 'VEO-02-00001', alias: 'Cerrado', broker_id: beto.id, created_by: beto.id, active: true, phase: 'CIERRE', corridor_id: 2, lat: 25.6, lng: -100.2, score: 80, permiso_status: 'en_tramite', clausula_condicional: true });
   const b = await loginAs('beto');
@@ -304,12 +304,18 @@ test('fase 5 EN OPERACIÓN: exige expediente de cierre completo y acepta fotos/v
   assert.equal(r.to_phase, 'EN_OPERACION');
   assert.equal((await call('POST', `requests/${r.id}/resolve`, { ...a, body: { decision: 'aprobada' } })).status, 200);
   assert.equal(db.veo_predios[0].phase, 'EN_OPERACION');
-  // En operación: no hay fase siguiente y se aceptan fotos/videos de operación
+  // En operación: no hay fase siguiente; el expediente queda bloqueado y las fotos/videos de
+  // operación se suben tras desbloquear con credenciales del administrador.
   det = await call('GET', 'predios/1', { cookie: b.cookie });
   assert.deepEqual(det.data.next_requirements, []);
   assert.equal(det.data.readiness.complete, true);
+  assert.equal(det.data.locked, true);
   assert.equal((await call('POST', 'predios/1/request', { ...b, body: {} })).status, 400);
-  const up = await call('POST', 'predios/1/documents/complete', { ...b, body: { doc_type: 'operacion', storage_path: '1/x-sitio.mp4', original_filename: 'sitio.mp4' } });
+  const body = { doc_type: 'operacion', storage_path: '1/x-sitio.mp4', original_filename: 'sitio.mp4' };
+  assert.equal((await call('POST', 'predios/1/documents/complete', { ...b, body })).status, 423);
+  const un = await call('POST', 'predios/1/unlock', { ...b, body: { username: 'ana', password: 'clave-segura-123' } });
+  assert.equal(un.status, 200, JSON.stringify(un.data));
+  const up = await call('POST', 'predios/1/documents/complete', { ...b, body, extra: { 'x-veo-unlock': un.data.token } });
   assert.equal(up.status, 200, JSON.stringify(up.data));
 });
 
