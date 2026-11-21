@@ -968,3 +968,26 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
  .mapa-page .map-overlay-top .streets-only-chip{display:none}
  .mapa-page .map-wrap .veo-north-indicator{top:58px}
 }
+
+/* Selección del punto en celular: el mapa ocupa la mayor parte de la pantalla */
+@media (max-width:720px){
+ .location-picker-dialog{display:flex;flex-direction:column}
+ .location-picker-dialog .picker-header{padding:10px 12px 4px;align-items:center}
+ .location-picker-dialog .picker-header small{display:none}
+ .location-picker-dialog .picker-header h2{font-size:19px;margin:0}
+ .location-picker-dialog .picker-header .icon-btn{min-width:42px;min-height:42px;width:42px;height:42px}
+ .location-picker-dialog .picker-search-bar{padding:4px 10px 6px;gap:6px}
+ .location-picker-dialog .picker-search-bar label{display:none}
+ .location-picker-dialog .picker-search-bar .field{height:42px;font-size:15px}
+ .location-picker-dialog .picker-street-row .btn{min-height:42px;padding:8px 12px}
+ .location-picker-dialog .picker-map-toolbar,.location-picker-dialog .picker-source-tip{display:none}
+ .location-picker-dialog .veo-route-guide{padding:0 10px 6px;gap:6px;flex-wrap:nowrap}
+ .location-picker-dialog .veo-route-guide>span:not(.veo-route-status){display:none}
+ .location-picker-dialog .veo-route-guide .veo-route-status{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .location-picker-dialog .veo-route-guide{box-sizing:border-box;max-width:100%}
+ .location-picker-dialog .veo-route-retry{flex:none;margin:0;padding:6px 9px;font-size:10.5px;white-space:nowrap}
+ .location-picker-dialog .picker-map-wrap{flex:1 0 auto;height:auto;min-height:max(360px,58dvh);margin:0 6px;border-radius:12px}
+ .location-picker-dialog .picker-map-hint{font-size:11px;padding:6px 10px}
+ .location-picker-dialog .picker-footer{padding:8px 10px calc(10px + env(safe-area-inset-bottom));gap:8px}
+ .location-picker-dialog .picker-footer-actions .btn{min-height:46px}
+}
