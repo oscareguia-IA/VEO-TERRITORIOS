@@ -991,3 +991,7 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
  .location-picker-dialog .picker-footer{padding:8px 10px calc(10px + env(safe-area-inset-bottom));gap:8px}
  .location-picker-dialog .picker-footer-actions .btn{min-height:46px}
 }
+
+/* Registrar predio: la ubicación se marca sólo desde el mapa (un solo botón) */
+.location-callout-label{display:block;margin:16px 0 8px}
+.create-predio-modal .location-callout-label+.location-callout{margin-top:0}
