@@ -52,8 +52,8 @@ global.fetch = async (url, opts = {}) => {
 };
 
 // ── Petición/respuesta falsas ───────────────────────────────────
-async function call(method, route, { body, cookie, csrf, origin } = {}) {
-  const headers = { host: 'veocrm.vercel.app' };
+async function call(method, route, { body, cookie, csrf, origin, extra } = {}) {
+  const headers = { host: 'veocrm.vercel.app', ...(extra || {}) };
   if (cookie) headers.cookie = cookie;
   if (csrf) headers['x-csrf-token'] = csrf;
   if (origin !== undefined) headers.origin = origin; else if (method !== 'GET') headers.origin = 'https://veocrm.vercel.app';
@@ -141,6 +141,29 @@ test('la sesión vence tras 15 minutos sin actividad y cada petición la renueva
   const boot2 = await call('GET', 'bootstrap', { cookie: cookie2 });
   assert.equal(boot2.data.csrf, csrf, 'el token CSRF no cambia al renovar la sesión');
   assert.equal((await call('POST', 'logout', { cookie: cookie2, csrf })).status, 200);
+});
+
+test('predio EN OPERACIÓN es de sólo lectura salvo desbloqueo con credenciales de administrador', async () => {
+  await addUser('ana', 'admin'); const beto = await addUser('beto', 'broker');
+  db.veo_predios.push({ id: 1, code: 'VEO-01-00001', alias: 'Operando', broker_id: beto.id, created_by: beto.id, active: true, phase: 'EN_OPERACION', corridor_id: 1 },
+                      { id: 2, code: 'VEO-01-00002', alias: 'Otro', broker_id: beto.id, created_by: beto.id, active: true, phase: 'EN_OPERACION', corridor_id: 1 });
+  const b = await loginAs('beto');
+  const det = await call('GET', 'predios/1', { cookie: b.cookie });
+  assert.equal(det.data.locked, true); assert.equal(det.data.unlocked, false);
+  const editar = (extra, id = 1) => call('PATCH', `predios/${id}`, { cookie: b.cookie, csrf: b.csrf, body: { alias: 'Cambio' }, extra });
+  assert.equal((await editar()).status, 423, 'sin desbloqueo no se edita');
+  assert.equal((await call('POST', 'predios/1/comments', { cookie: b.cookie, csrf: b.csrf, body: { body: 'nota' } })).status, 423);
+  assert.equal((await call('POST', 'predios/1/documents/complete', { cookie: b.cookie, csrf: b.csrf, body: { doc_type: 'operacion', storage_path: '1/x.jpg', original_filename: 'x.jpg' } })).status, 423);
+  // contraseña equivocada o credenciales que no son de administrador
+  assert.equal((await call('POST', 'predios/1/unlock', { cookie: b.cookie, csrf: b.csrf, body: { username: 'ana', password: 'mala' } })).status, 401);
+  assert.equal((await call('POST', 'predios/1/unlock', { cookie: b.cookie, csrf: b.csrf, body: { username: 'beto', password: 'clave-segura-123' } })).status, 401);
+  const ok = await call('POST', 'predios/1/unlock', { cookie: b.cookie, csrf: b.csrf, body: { username: 'ana', password: 'clave-segura-123' } });
+  assert.equal(ok.status, 200, JSON.stringify(ok.data));
+  const h = { 'x-veo-unlock': ok.data.token };
+  assert.equal((await editar(h)).status, 200, 'con desbloqueo sí se edita');
+  assert.equal((await editar(h, 2)).status, 423, 'el desbloqueo es sólo para ese predio');
+  assert.equal((await editar({ 'x-veo-unlock': ok.data.token.replace(/.$/, c => c === 'A' ? 'B' : 'A') })).status, 423, 'token alterado no sirve');
+  assert.ok(db.veo_activity.some(x => x.kind === 'desbloqueo' && /autorizó/.test(x.detail)), 'queda en la bitácora');
 });
 
 test('bootstrap nunca expone password_hash', async () => {

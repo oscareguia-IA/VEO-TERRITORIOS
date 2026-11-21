@@ -1012,3 +1012,19 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
 .quickflow .phase-card-4 .flow-text small{color:#ff6b9b}
 .quickflow .phase-card-5 .flow-text small{color:#3ddc97}
 @media (max-width:720px){.quickflow .phase-card .flow-text small{font-size:14px}}
+
+/* Predio EN OPERACIÓN: aviso de sólo lectura / desbloqueo */
+.lock-banner{display:flex;align-items:center;gap:12px;margin:12px 0 4px;padding:12px 14px;border-radius:14px;border:1px solid #3ddc9766;background:linear-gradient(105deg,#123d33,#10302b);color:#d8f7ea}
+.lock-banner.is-open{border-color:#ffc06d88;background:linear-gradient(105deg,#4a3517,#3a2c18);color:#ffe9c8}
+.lock-banner .lock-ico{font-size:22px;line-height:1}
+.lock-banner>div{flex:1;min-width:0}
+.lock-banner strong{display:block;font-size:14px}
+.lock-banner small{display:block;font-size:12px;opacity:.85;margin-top:2px}
+.lock-banner .btn{flex:none}
+.drawer-box.is-locked #drawer-content input:disabled,.drawer-box.is-locked #drawer-content select:disabled,.drawer-box.is-locked #drawer-content textarea:disabled{opacity:.8;cursor:not-allowed}
+.drawer-box.is-locked form[data-form="upload-doc"],.drawer-box.is-locked form[data-form="add-comment"],.drawer-box.is-locked [data-action="delete-doc"],.drawer-box.is-locked [data-action="prompt-delete-predio"],.drawer-box.is-locked [data-action="archive-predio"]{display:none!important}
+.drawer-box.is-locked #drawer-content button[type="submit"]{display:none}
+
+/* Las ventanas (desbloquear, eliminar, rechazar) se muestran por encima del expediente abierto */
+.modal-root:not(:empty){z-index:120}
+.unlock-modal{max-width:460px;width:100%}

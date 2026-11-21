@@ -71,6 +71,13 @@ const reqItems=(p,docs,to)=>{const found=t=>docs.some(x=>x.doc_type===t),items=[
 function readiness(p,docs){const x=[['contrato','Contrato firmado / condicionado'],['memoria_calculo','Memoria de cálculo estructural'],['factibilidad_electrica','Factibilidad eléctrica'],['programa_obra','Evidencia de programa de obra']].map(([key,label])=>({key,label,done:docs.some(d=>d.doc_type===key)}));x.push({key:'permiso',label:'Permiso municipal autorizado',done:p.permiso_status==='autorizado'},{key:'clausula',label:'Cláusula suspensiva reconocida',done:!!p.clausula_condicional});return {complete:['CIERRE','EN_OPERACION'].includes(p.phase)&&x.every(q=>q.done),items:x}}
 // ── Límite de intentos (anti fuerza bruta) ──
 const LOGIN_USER_MAX=5, LOGIN_IP_MAX=20, LOGIN_WINDOW_S=900, LOGIN_LOCK_S=900;
+// Predios EN OPERACIÓN: sólo lectura. Para editar hace falta un desbloqueo temporal (15 min) firmado,
+// que se emite únicamente al validar usuario y contraseña de un administrador activo.
+const UNLOCK_MS=15*60*1000;
+const isLocked=p=>p?.phase==='EN_OPERACION';
+function unlockToken(pid,uid,adminId){const data=Buffer.from(JSON.stringify({p:pid,u:uid,a:adminId,exp:Date.now()+UNLOCK_MS})).toString('base64url');return data+'.'+mac('desbloqueo:'+data)}
+function unlockValid(req,me,p){try{const [b,s]=String(req.headers['x-veo-unlock']||'').split('.');if(!b||!s)return false;const x=Buffer.from(s),y=Buffer.from(mac('desbloqueo:'+b));if(x.length!==y.length||!crypto.timingSafeEqual(x,y))return false;const d=JSON.parse(Buffer.from(b,'base64url').toString());return d.p===p.id&&d.u===me.id&&d.exp>Date.now()}catch(_){return false}}
+function ensureUnlocked(req,me,p){if(isLocked(p)&&!unlockValid(req,me,p))throw codeError(423,'Predio EN OPERACIÓN: está bloqueado. Para editar se requieren las credenciales del administrador (botón DESBLOQUEAR).')}
 const DUMMY_HASH='scrypt$00000000000000000000000000000000000000$'+'0'.repeat(128);
 const clientIp=req=>String(req?.headers?.['x-real-ip']||String(req?.headers?.['x-forwarded-for']||'').split(',')[0]||'desconocida').trim().slice(0,64);
 async function rpc(fn,args){try{return await rest('rpc/'+fn,{method:'POST',data:args})}catch(e){console.error('VEO_RATE_LIMIT',fn,e.message);return null}}
@@ -211,10 +218,20 @@ async function handle(req,res){
   const pid=Number(parts[1]);ensure(Number.isSafeInteger(pid)&&pid>0,'ID inválido.');const p=await predioFor(me,pid);
   if(parts.length===2&&method==='GET'){
    const [docs,comments,activity,requests]=await Promise.all([list('veo_documents',{predio_id:`eq.${pid}`,order:'created_at.asc'}),list('veo_comments',{predio_id:`eq.${pid}`,order:'created_at.asc'}),list('veo_activity',{predio_id:`eq.${pid}`,order:'created_at.asc'}),list('veo_requests',{predio_id:`eq.${pid}`,order:'created_at.desc'})]);
-   return {predio:p,documents:docs,comments,history:activity.map(x=>({...x,author:x.user_name})),requests,next_requirements:p.phase===LAST_PHASE?[]:reqItems(p,docs,PHASES[PHASES.indexOf(p.phase)+1]),readiness:readiness(p,docs),can_edit:canEdit(me,p)};
+   return {predio:p,documents:docs,comments,history:activity.map(x=>({...x,author:x.user_name})),requests,next_requirements:p.phase===LAST_PHASE?[]:reqItems(p,docs,PHASES[PHASES.indexOf(p.phase)+1]),readiness:readiness(p,docs),can_edit:canEdit(me,p),locked:isLocked(p),unlocked:isLocked(p)&&unlockValid(req,me,p)};
+  }
+  if(parts[2]==='unlock'&&method==='POST'){
+   ensure(isLocked(p),'Este predio no está bloqueado.');ensure(canEdit(me,p)||mayManage(me),'No tienes acceso a este predio.',403);
+   const k=`desbloqueo:${me.id}`;const wait=Number(await rpc('veo_login_check',{p_keys:[k]}))||0;if(wait>0)throw tooMany(res,wait);
+   const username=cleanText(b.username,50).toLowerCase();const admin=username?await one('veo_users',{username:`eq.${username}`}):null;
+   const ok=admin&&admin.active&&admin.role==='admin'?await checkPassword(String(b.password||''),admin.password_hash):(await checkPassword(String(b.password||''),DUMMY_HASH),false);
+   if(!ok){const lock=Number(await rpc('veo_login_fail',{p_key:k,p_max:LOGIN_USER_MAX,p_window_s:LOGIN_WINDOW_S,p_lock_s:LOGIN_LOCK_S}))||0;await audit(me,pid,'desbloqueo','Intento fallido de desbloquear el predio en operación');if(lock>0)throw tooMany(res,lock);throw codeError(401,'Credenciales de administrador incorrectas.')}
+   await rpc('veo_login_reset',{p_key:k});
+   await audit(me,pid,'desbloqueo',`Desbloqueó la edición del predio en operación (autorizó ${admin.display_name||admin.username}, 15 min)`);
+   return {ok:true,token:unlockToken(pid,me.id,admin.id),expires_at:new Date(Date.now()+UNLOCK_MS).toISOString()};
   }
   if(parts.length===2&&method==='PATCH'){
-   ensure(canEdit(me,p),'No puedes editar este predio.',403);const allowed=['alias','municipio','direccion','referencia','dron_url','propietario','telefono','email','fecha_contacto','interes','fecha_carta','clausula_condicional','notas','ratings_json'];
+   ensure(canEdit(me,p),'No puedes editar este predio.',403);ensureUnlocked(req,me,p);const allowed=['alias','municipio','direccion','referencia','dron_url','propietario','telefono','email','fecha_contacto','interes','fecha_carta','clausula_condicional','notas','ratings_json'];
    if(mayManage(me))allowed.push('broker_id','lat','lng','corridor_id');
    if(['admin','supervisor','legal'].includes(me.role))allowed.push('permiso_status');
    const up={};for(const f of allowed)if(Object.hasOwn(b,f))up[f]=b[f];
@@ -226,22 +243,22 @@ async function handle(req,res){
    up.updated_at=new Date().toISOString();await patch('veo_predios',pid,up);await audit(me,pid,'edicion','Actualizó expediente');return{ok:true};
   }
   if(parts.length===2&&method==='DELETE'){
-   ensure(me.role==='admin','Sólo ADMIN puede eliminar predios definitivamente.',403);ensure(b.confirmation_code===p.code,'Escribe el ID exacto del predio.');
+   ensure(me.role==='admin','Sólo ADMIN puede eliminar predios definitivamente.',403);ensureUnlocked(req,me,p);ensure(b.confirmation_code===p.code,'Escribe el ID exacto del predio.');
    const docs=await list('veo_documents',{predio_id:`eq.${pid}`});await remove('veo_predios',pid);
    let pending=0;for(const d of docs)try{await storage('DELETE',`object/veo-documentos/${encodedPath(d.storage_path)}`)}catch(_){pending++}
    await audit(me,null,'eliminacion_permanente',`Eliminó definitivamente el expediente ${p.code}`);return{ok:true,deleted_code:p.code,files_cleanup_pending:pending};
   }
-  if(parts[2]==='comments'&&method==='POST'){ensure(canEdit(me,p),'No puedes comentar.',403);ensure(cleanText(b.body,5000),'Comentario vacío.');await add('veo_comments',{predio_id:pid,user_id:me.id,author:me.display_name,body:cleanText(b.body,5000)});await audit(me,pid,'comentario','Agregó comentario');return{ok:true}}
-  if(parts[2]==='archive'&&method==='POST'){ensure(mayManage(me),'Sólo supervisión puede archivar.',403);await patch('veo_predios',pid,{active:!!b.restore,updated_at:new Date().toISOString()});await audit(me,pid,'archivo',b.restore?'Restauró predio':'Archivó predio');return{ok:true}}
+  if(parts[2]==='comments'&&method==='POST'){ensure(canEdit(me,p),'No puedes comentar.',403);ensureUnlocked(req,me,p);ensure(cleanText(b.body,5000),'Comentario vacío.');await add('veo_comments',{predio_id:pid,user_id:me.id,author:me.display_name,body:cleanText(b.body,5000)});await audit(me,pid,'comentario','Agregó comentario');return{ok:true}}
+  if(parts[2]==='archive'&&method==='POST'){ensure(mayManage(me),'Sólo supervisión puede archivar.',403);ensureUnlocked(req,me,p);await patch('veo_predios',pid,{active:!!b.restore,updated_at:new Date().toISOString()});await audit(me,pid,'archivo',b.restore?'Restauró predio':'Archivó predio');return{ok:true}}
   if(parts[2]==='request'&&method==='POST'){ensure(canEdit(me,p),'No puedes solicitar avance.',403);const to=PHASES[PHASES.indexOf(p.phase)+1];ensure(to,'El predio ya está en operación.');const docs=await list('veo_documents',{predio_id:`eq.${pid}`});const missing=reqItems(p,docs,to).filter(x=>!x.done).map(x=>x.label);ensure(!missing.length,'Faltan requisitos: '+missing.join('; '));const pending=await list('veo_requests',{predio_id:`eq.${pid}`,status:'eq.pendiente'});ensure(!pending.length,'Ya hay una solicitud pendiente.');await add('veo_requests',{predio_id:pid,from_phase:p.phase,to_phase:to,code:p.code,alias:p.alias,requester_name:me.display_name,reason:cleanText(b.reason,500)});await audit(me,pid,'solicitud',`Solicitó avance a ${to}`);return {ok:true}}
   if(parts[2]==='documents'&&parts[3]==='sign'&&method==='POST'){
-   ensure(canEdit(me,p),'Sin permiso para adjuntar.',403);ensure(DOC_TYPES.has(b.doc_type),'Tipo documental no válido.');ensure(Number.isSafeInteger(b.size_bytes)&&b.size_bytes>0&&b.size_bytes<=MAX_FILE,'El archivo debe ser de máximo 45 MB.');
+   ensure(canEdit(me,p),'Sin permiso para adjuntar.',403);ensureUnlocked(req,me,p);ensure(DOC_TYPES.has(b.doc_type),'Tipo documental no válido.');ensure(Number.isSafeInteger(b.size_bytes)&&b.size_bytes>0&&b.size_bytes<=MAX_FILE,'El archivo debe ser de máximo 45 MB.');
    const filename=standardName(b.doc_type,b.original_filename,[]).replace(/_1(\.|$)/,'$1');const path=`${pid}/${crypto.randomUUID()}-${filename}`;
    const result=await storage('POST',`object/upload/sign/veo-documentos/${encodedPath(path)}`,{});
    return {url:signedLink(result,path,'upload/sign'),storage_path:path,filename};
   }
   if(parts[2]==='documents'&&parts[3]==='complete'&&method==='POST'){
-   ensure(canEdit(me,p),'Sin permiso para adjuntar.',403);ensure(DOC_TYPES.has(b.doc_type)&&typeof b.storage_path==='string'&&b.storage_path.startsWith(`${pid}/`)&&b.storage_path.length<400,'Archivo inválido.');const geo=docGeo(b);
+   ensure(canEdit(me,p),'Sin permiso para adjuntar.',403);ensureUnlocked(req,me,p);ensure(DOC_TYPES.has(b.doc_type)&&typeof b.storage_path==='string'&&b.storage_path.startsWith(`${pid}/`)&&b.storage_path.length<400,'Archivo inválido.');const geo=docGeo(b);
    const exists=await list('veo_documents',{storage_path:`eq.${b.storage_path}`,limit:1});ensure(!exists.length,'Archivo previamente registrado.');
    const info=await storage('GET',`object/info/veo-documentos/${encodedPath(b.storage_path)}`);const size=Number(info?.metadata?.size||info?.size||0);ensure(size>0&&size<=MAX_FILE,'No se localizó el archivo cargado o supera el límite.');
    const prior=await list('veo_documents',{predio_id:`eq.${pid}`,select:'doc_type,original_filename'});
@@ -262,7 +279,7 @@ async function handle(req,res){
   if(parts[2]==='content'&&method==='GET'){
    const result=await storage('POST',`object/sign/veo-documentos/${encodedPath(d.storage_path)}`,{expiresIn:900});res.statusCode=302;res.setHeader('Location',signedLink(result,d.storage_path,'sign'));res.end();return null;
   }
-  if(parts.length===2&&method==='DELETE'){ensure(canEdit(me,p),'Sin permiso para eliminar documentos.',403);await remove('veo_documents',d.id);try{await storage('DELETE',`object/veo-documentos/${encodedPath(d.storage_path)}`)}catch(_){console.warn('Pendiente de limpieza',d.id)}await audit(me,p.id,'documento','Eliminó documento');return{ok:true}}
+  if(parts.length===2&&method==='DELETE'){ensure(canEdit(me,p),'Sin permiso para eliminar documentos.',403);ensureUnlocked(req,me,p);await remove('veo_documents',d.id);try{await storage('DELETE',`object/veo-documentos/${encodedPath(d.storage_path)}`)}catch(_){console.warn('Pendiente de limpieza',d.id)}await audit(me,p.id,'documento','Eliminó documento');return{ok:true}}
  }
  throw codeError(404,'Ruta de API no encontrada.');
 }

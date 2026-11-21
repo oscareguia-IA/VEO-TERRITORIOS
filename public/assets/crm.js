@@ -133,7 +133,7 @@ async function exportLocalBackup(){
 }
 
 async function api(path,options={}){
- let headers={...options.headers};if(options.method&&options.method!=='GET'&&!(options.body instanceof FormData))headers['Content-Type']='application/json';if(options.method&&options.method!=='GET'&&path!=='/api/login')headers['X-CSRF-Token']=state.csrf;
+ let headers={...options.headers};if(options.method&&options.method!=='GET'&&!(options.body instanceof FormData))headers['Content-Type']='application/json';if(options.method&&options.method!=='GET'&&path!=='/api/login')headers['X-CSRF-Token']=state.csrf;{const u=unlockFor(state.drawer?.predio?.id);if(u)headers['X-VEO-Unlock']=u.token}
  let r=await fetch(path,{...options,headers,credentials:'same-origin'});
  if(r.status===401&&path!=='/api/login'){loginScreen();throw Error('Sesión vencida: vuelva a iniciar sesión')}
  if(!r.ok){let d;try{d=await r.json()}catch{d={detail:r.statusText}}let text=typeof d.detail==='string'?d.detail:(d.detail?.missing?'Faltan requisitos: '+d.detail.missing.join('; '):JSON.stringify(d.detail||d));throw Error(text)}
@@ -654,7 +654,29 @@ function showPermanentDeleteDialog(p){
  modal.querySelector('#delete-confirm-code')?.focus();
 }
 function drawerTabs(){return ['general','score','docs','check','comments'].map((tab,i)=>`<button data-action="drawer-tab" data-tab="${tab}" class="${state.drawerTab===tab?'active':''}">${['Ficha del predio','Calificación','Documentos','Hitos / Cierre','Bitácora'][i]}</button>`).join('')}
-function drawDetail(){const d=state.drawer;if(!d)return;const p=d.predio;document.getElementById('drawer').innerHTML=`<div class="drawer-box"><div class="drawer-top"><div><small>${E(p.code)} · ${E(cname(p.corridor_id))}</small><h2>${E(p.alias)}</h2><div class="spaced mt12">${chipPhase(p)} <span class="chip">${p.score??"—"}/100 SCORE</span> ${d.readiness.complete?'<span class="chip green">● APTO PARA OPERAR</span>':''}</div>${isAdmin()?`<button type="button" class="btn btn-danger small mt12" data-action="prompt-delete-predio" data-id="${p.id}">✕ ELIMINAR EXPEDIENTE Y PIN</button>`:''}</div><button class="icon-btn" data-action="close-drawer">×</button></div><div class="phase-stepper">${PHASES.map((stage,i)=>`<div class="phase-step ${i<stageIndex(p.phase)?'passed':i===stageIndex(p.phase)?'current':''}">${['FACTIBILIDAD','CONTACTO','SEGUIMIENTO','CIERRE','OPERACIÓN'][i]}</div>`).join('')}</div><div class="tabs">${drawerTabs()}</div><div id="drawer-content">${drawerContent()}</div></div>`}
+function drawDetail(){const d=state.drawer;if(!d)return;const p=d.predio;document.getElementById('drawer').innerHTML=`<div class="drawer-box"><div class="drawer-top"><div><small>${E(p.code)} · ${E(cname(p.corridor_id))}</small><h2>${E(p.alias)}</h2><div class="spaced mt12">${chipPhase(p)} <span class="chip">${p.score??"—"}/100 SCORE</span> ${d.readiness.complete?'<span class="chip green">● APTO PARA OPERAR</span>':''}</div>${isAdmin()?`<button type="button" class="btn btn-danger small mt12" data-action="prompt-delete-predio" data-id="${p.id}">✕ ELIMINAR EXPEDIENTE Y PIN</button>`:''}</div><button class="icon-btn" data-action="close-drawer">×</button></div><div class="phase-stepper">${PHASES.map((stage,i)=>`<div class="phase-step ${i<stageIndex(p.phase)?'passed':i===stageIndex(p.phase)?'current':''}">${['FACTIBILIDAD','CONTACTO','SEGUIMIENTO','CIERRE','OPERACIÓN'][i]}</div>`).join('')}</div>${lockBanner(d)}<div class="tabs">${drawerTabs()}</div><div id="drawer-content">${drawerContent()}</div></div>`;applyPredioLock(d)}
+// ── Predio EN OPERACIÓN: sólo lectura salvo desbloqueo con credenciales del administrador ──
+state.unlocks=state.unlocks||{};
+function unlockFor(pid){const u=pid&&state.unlocks[pid];if(u&&Date.parse(u.expires_at)>Date.now())return u;if(u)delete state.unlocks[pid];return null}
+const predioReadOnly=d=>!!(d?.locked&&!unlockFor(d.predio?.id));
+function lockBanner(d){
+ if(!d.locked)return '';
+ const u=unlockFor(d.predio.id);
+ if(u)return `<div class="lock-banner is-open"><span class="lock-ico">🔓</span><div><strong>Edición desbloqueada</strong><small>Predio en operación · editable hasta las ${new Date(u.expires_at).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</small></div><button type="button" class="btn btn-ghost small" data-action="relock-predio">BLOQUEAR</button></div>`;
+ return `<div class="lock-banner"><span class="lock-ico">🔒</span><div><strong>Predio en operación · sólo lectura</strong><small>Para editar se requieren las credenciales del administrador.</small></div><button type="button" class="btn btn-primary small" data-action="unlock-predio">DESBLOQUEAR</button></div>`;
+}
+function applyPredioLock(d){
+ const box=document.querySelector('#drawer .drawer-box');if(!box)return;
+ const ro=predioReadOnly(d);box.classList.toggle('is-locked',ro);if(!ro)return;
+ const keep=new Set(['close-drawer','drawer-tab','unlock-predio','preview-doc','focus-property']);
+ box.querySelectorAll('#drawer-content input,#drawer-content select,#drawer-content textarea').forEach(el=>{el.disabled=true});
+ box.querySelectorAll('button').forEach(b=>{if(!keep.has(b.dataset.action))b.disabled=true});
+}
+function showUnlockDialog(){
+ const p=state.drawer?.predio;if(!p)return;
+ document.getElementById('modal').innerHTML=`<div class="modal-box unlock-modal"><div class="modal-top"><div><small>PREDIO EN OPERACIÓN · ${E(p.code)}</small><h2>Desbloquear edición</h2></div><button class="icon-btn" type="button" data-action="close-modal" aria-label="Cerrar">×</button></div><p class="subhead">Ingresa el usuario y la contraseña del <b>administrador</b>. La edición quedará habilitada 15 minutos y el desbloqueo se registra en la bitácora.</p><form data-form="unlock-predio"><div class="field-group"><label class="field-label" for="unlock-user">Usuario administrador</label><input id="unlock-user" class="field" name="username" autocomplete="off" autocapitalize="none" required value="${isAdmin()?E(state.user.username):''}"/></div><div class="field-group"><label class="field-label" for="unlock-pass">Contraseña del administrador</label><input id="unlock-pass" class="field" name="password" type="password" autocomplete="off" required/></div><div class="spaced mt20" style="justify-content:flex-end"><button type="button" class="btn btn-ghost" data-action="close-modal">CANCELAR</button><button class="btn btn-primary" type="submit">DESBLOQUEAR →</button></div></form></div>`;
+ document.getElementById(isAdmin()?'unlock-pass':'unlock-user')?.focus();
+}
 function drawerContent(){const d=state.drawer,p=d.predio;return state.drawerTab==='general'?viewGeneral(p):state.drawerTab==='score'?viewScore(p):state.drawerTab==='docs'?viewDocs(d):state.drawerTab==='check'?viewCheck(d):viewComments(d)}
 function brokerSelect(id,disabled=false){return `<select name="broker_id" class="field" ${disabled?'disabled':''}><option value="">Sin asignar</option>${brokers().filter(u=>u.active||u.id===id).map(u=>`<option value="${u.id}" ${u.id==id?'selected':''}>${E(u.display_name)}</option>`).join('')}</select>`}
 const F=(label,name,val='',other='')=>`<div class="field-group"><label class="field-label">${label}</label><input class="field" name="${name}" value="${E(val)}" ${other}/></div>`;
@@ -711,6 +733,8 @@ async function action(target){const cmd=target.dataset.action,id=+target.dataset
   if(cmd==='aforo-minus'){aforoEscala(aforoZoomActual-25);return} if(cmd==='aforo-plus'){aforoEscala(aforoZoomActual+25);return} if(cmd==='aforo-fit'){aforoEscala(100);return} if(cmd==='aforo-double'){aforoEscala(200);return} if(cmd==='open-sheet'){const c=corridor(id);if(c&&!hasSheet(c))throw Error('Este corredor no tiene ficha de aforo en el estudio.');showSheet(id);return}
   if(cmd==='search-node'){await searchNode(id);return}
   if(cmd==='drawer-tab'){state.drawerTab=target.dataset.tab;drawDetail();return}
+  if(cmd==='unlock-predio'){showUnlockDialog();return}
+  if(cmd==='relock-predio'){const pid=state.drawer?.predio?.id;if(pid)delete state.unlocks[pid];await openPredio(pid,state.drawerTab);toast('Predio bloqueado de nuevo.');return}
   if(cmd==='focus-property'){let p=state.data.predios.find(x=>x.id===id);if(p){state.mapProvider='veo';state.selectedCorridor=p.corridor_id;state.phaseFilter='';state.brokerFilter='';state.view='mapa';closeDrawer();render();setTimeout(()=>{state.map?.flyTo([+p.lat,+p.lng],16);state.map?.openMarker?.(p.id)},150)}return}
   if(cmd==='my-password'){showOwnPasswordForm();return}
   if(cmd==='deactivate-broker'){
@@ -787,6 +811,7 @@ async function forms(form){const cmd=form.dataset.form;let d=fields(form);const 
   toast(response.files_cleanup_pending?`Predio ${response.deleted_code} eliminado. Revisa ${response.files_cleanup_pending} archivo(s) pendiente(s) de limpieza en el servidor.`:`Predio ${response.deleted_code} y todos sus registros eliminados. El pin desapareció del mapa.`,!!response.files_cleanup_pending);
   return;
  }
+ if(cmd==='unlock-predio'){const pid=state.drawer?.predio?.id;if(!pid)return;const r=await api(`/api/predios/${pid}/unlock`,{method:'POST',body:JSON.stringify({username:d.username,password:d.password})});state.unlocks[pid]={token:r.token,expires_at:r.expires_at};document.getElementById('modal').innerHTML='';await openPredio(pid,state.drawerTab);toast('Edición desbloqueada por 15 minutos.');return}
  if(cmd==='create-predio'){if(!d.lat||!d.lng)throw Error('Toca «Marcar ubicación en el mapa» y confirma el pin para registrar el predio.');if((d.lat&&!d.lng)||(!d.lat&&d.lng))throw Error('Selecciona un pin válido con ambas coordenadas.');const point=d.lat&&d.lng?normalizePoint(d.lat,d.lng):null;if((d.lat||d.lng)&&!point)throw Error('La latitud o longitud no es válida.');await assertCorridorPoint(+d.corridor_id,point);const p=await save('/api/predios','POST',{corridor_id:+d.corridor_id,alias:d.alias,broker_id:d.broker_id?+d.broker_id:null,lat:point?.lat??null,lng:point?.lng??null});state.pin=null;document.getElementById('modal').innerHTML='';await refresh();await openPredio(p.id);toast('Predio '+p.code+' creado correctamente.');return}
  if(cmd==='reject-request'){const note=String(d.review_note||'').trim();if(note.length<5)throw Error('Escribe el motivo del rechazo (mínimo 5 caracteres).');await api(`/api/requests/${+form.dataset.id}/resolve`,{method:'POST',body:JSON.stringify({decision:'rechazada',review_note:note})});document.getElementById('modal').innerHTML='';toast('Cambio de fase rechazado. El motivo quedó en la bitácora.');await refresh(!!state.drawer);return}
  if(cmd==='create-user'){await save('/api/users','POST',d);document.getElementById('modal').innerHTML='';await refresh();toast('Usuario creado con contraseña temporal. Debe cambiarla al ingresar.');return}
