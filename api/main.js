@@ -245,7 +245,7 @@ async function handle(req,res){
    const exists=await list('veo_documents',{storage_path:`eq.${b.storage_path}`,limit:1});ensure(!exists.length,'Archivo previamente registrado.');
    const info=await storage('GET',`object/info/veo-documentos/${encodedPath(b.storage_path)}`);const size=Number(info?.metadata?.size||info?.size||0);ensure(size>0&&size<=MAX_FILE,'No se localizó el archivo cargado o supera el límite.');
    const prior=await list('veo_documents',{predio_id:`eq.${pid}`,select:'doc_type,original_filename'});
-   await add('veo_documents',{predio_id:pid,doc_type:b.doc_type,storage_path:b.storage_path,original_filename:standardName(b.doc_type,b.original_filename,prior),size_bytes:size,uploaded_by_name:me.display_name,...geo});await audit(me,pid,'documento',`Adjuntó ${b.doc_type}`);return{ok:true};
+   await add('veo_documents',{predio_id:pid,doc_type:b.doc_type,storage_path:b.storage_path,original_filename:standardName(b.doc_type,b.original_filename,prior),source_filename:cleanText(b.original_filename,180),size_bytes:size,uploaded_by_name:me.display_name,...geo});await audit(me,pid,'documento',`Adjuntó ${b.doc_type}`);return{ok:true};
   }
  }
  if(parts[0]==='requests'&&parts[2]==='resolve'&&method==='POST'){
