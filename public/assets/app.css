@@ -947,3 +947,24 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
 
 /* Globo del mapa: la foto/video (horizontal o vertical) se ajusta al alto disponible del mapa */
 .veo-gmap-slide img,.veo-gmap-slide video{max-height:var(--veo-gm-media-max,340px)}
+
+/* Mapa de oportunidades en celular: mapa arriba y grande, filtros compactos debajo */
+@media (max-width:720px){
+ .main.map-fullwidth{padding-top:10px}
+ .mapa-page{display:flex;flex-direction:column}
+ .mapa-page>.page-row{display:none}
+ .mapa-page>.map-layout{display:contents}
+ .mapa-page .map-wrap{order:1}
+ .mapa-page>.filter-row{order:2}
+ .mapa-page .map-side{order:3;display:flex;flex-direction:column;gap:12px;margin-top:8px;width:100%}
+ .mapa-page .map-side>.panel{width:100%;max-width:none}
+ .mapa-page .map-wrap{min-height:0!important;border-radius:14px}
+ .mapa-page .opportunity-native-map{height:100%!important;min-height:0!important}
+ .mapa-page .filter-row{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0 4px}
+ .mapa-page .filter-row>.field{min-height:42px;font-size:15px;padding-top:8px;padding-bottom:8px}
+ .mapa-page .filter-row>.btn{min-height:40px;grid-column:auto!important;font-size:12px}
+ .mapa-page .filter-row>.chip,.mapa-page .filter-row>.streets-only-chip{display:none}
+ .mapa-page .map-overlay-top{top:10px;left:10px;right:10px}
+ .mapa-page .map-overlay-top .streets-only-chip{display:none}
+ .mapa-page .map-wrap .veo-north-indicator{top:58px}
+}
