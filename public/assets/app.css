@@ -1047,3 +1047,17 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
 @media (max-width:720px){.predio-tiles{grid-template-columns:1fr;gap:8px}.predio-tile{padding:10px 12px 10px 14px}}
 .predio-tile-id{white-space:nowrap;flex:none}
 .predio-tile-phase{min-width:0;overflow:hidden;text-overflow:ellipsis}
+
+/* Inicio: totales PIPELINE (fases 1-4) y SITIOS ESPECTACULARES EN OPERACIÓN (fase 5) */
+.dash-totals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}
+.dash-total{position:relative;display:flex;flex-direction:column;gap:6px;text-align:left;padding:18px 44px 18px 20px;border-radius:16px;border:1.5px solid;color:#f3f8ff;font:inherit;cursor:pointer;min-width:0;transition:filter .15s,transform .15s}
+.dash-total:hover,.dash-total:focus-visible{filter:brightness(1.12);transform:translateY(-2px);outline:none}
+.dash-total small{font-size:12px;font-weight:850;letter-spacing:1.6px}
+.dash-total b{font-family:'Space Grotesk',sans-serif;font-size:52px;line-height:1;font-weight:800;letter-spacing:-1px}
+.dash-total em{font-style:normal;font-size:13px;color:#c8d9e6}
+.dash-total-go{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:30px;opacity:.7}
+.dash-total-pipeline{background:linear-gradient(120deg,#1b3a63,#182a47 70%);border-color:#4f7fc0;box-shadow:inset 5px 0 #6aa8ff}
+.dash-total-pipeline small,.dash-total-pipeline b{color:#8cc0ff}
+.dash-total-operacion{background:linear-gradient(120deg,#175343,#12362f 70%);border-color:#2f9c78;box-shadow:inset 5px 0 #3ddc97}
+.dash-total-operacion small,.dash-total-operacion b{color:#3ddc97}
+@media (max-width:720px){.dash-totals{grid-template-columns:1fr;gap:10px}.dash-total{padding:14px 40px 14px 16px}.dash-total b{font-size:44px}}
