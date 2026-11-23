@@ -42,7 +42,11 @@ function mapSvg(sites,{w=1000,h=560,labels=true,dark=false,minSpan=0.06}={}){
   for(const [id,ls] of Object.entries(trazos||{})){const on=used.has(+id);for(const l of ls){if(l.length<2)continue;lines+=`<path d="M${l.map(q=>X(q[1]).toFixed(1)+' '+Y(q[0]).toFixed(1)).join('L')}" fill="none" stroke="${on?hot:cold}" stroke-width="${on?6:3}" stroke-linecap="round" stroke-linejoin="round" opacity="${on?1:.8}"/>`}}
   let cl='';const taken=pts.map(p=>[X(+p.lng),Y(+p.lat)]);if(labels)for(const id of used){const ls=(trazos||{})[id];if(!ls)continue;let best=null;const free=(x,y)=>taken.every(([a,b])=>Math.abs(a-x)>150||Math.abs(b-y)>34);for(const l of ls){for(const q of l){const x=X(q[1]),y=Y(q[0]);if(x>60&&x<w-200&&y>40&&y<h-40&&free(x,y)){best=[x,y];break}}if(best)break}if(best)taken.push(best);
     if(best)cl+=`<text x="${(best[0]+10).toFixed(0)}" y="${(best[1]-10).toFixed(0)}" font-family="${FONT}" font-size="12" font-weight="800" letter-spacing="1" fill="${dark?'#ff9ab7':'#c2185b'}" stroke="${bg}" stroke-width="4" paint-order="stroke">${esc(corrName(id).toUpperCase())}</text>`}
-  const pins=pts.map(p=>{const x=X(+p.lng),y=Y(+p.lat),c=PH_COLOR[pIdx(p)];return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="26" fill="${c}" opacity=".18"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="16" fill="${c}" stroke="#fff" stroke-width="3.5"/><text x="${x.toFixed(1)}" y="${(y+5.5).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="15" font-weight="800" fill="#fff">${p._n}</text>`}).join('');
+  // Separar pines que se enciman: se desplazan en espiral y se dibuja una línea guía al punto real.
+  const R=17,pos=pts.map(p=>({p,x0:X(+p.lng),y0:Y(+p.lat)}));pos.forEach(a=>{a.x=a.x0;a.y=a.y0});
+  for(let it=0;it<60;it++){let moved=false;for(let a=0;a<pos.length;a++)for(let b=a+1;b<pos.length;b++){const A=pos[a],B=pos[b];let dx=B.x-A.x,dy=B.y-A.y,d=Math.hypot(dx,dy);const min=2*R+8;if(d<min){if(d<.01){dx=Math.cos(b*2.4);dy=Math.sin(b*2.4);d=1}const k=(min-d)/2/d;A.x-=dx*k;A.y-=dy*k;B.x+=dx*k;B.y+=dy*k;moved=true}}if(!moved)break}
+  for(const a of pos){a.x=Math.max(R+4,Math.min(w-R-4,a.x));a.y=Math.max(R+4,Math.min(h-R-4,a.y))}
+  const pins=pos.map(({p,x0,y0,x,y})=>{const c=PH_COLOR[pIdx(p)],off=Math.hypot(x-x0,y-y0)>4;return `${off?`<line x1="${x0.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${c}" stroke-width="2"/><circle cx="${x0.toFixed(1)}" cy="${y0.toFixed(1)}" r="4" fill="${c}"/>`:`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="26" fill="${c}" opacity=".18"/>`}<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${R-1}" fill="${c}" stroke="#fff" stroke-width="3.5"/><text x="${x.toFixed(1)}" y="${(y+5.5).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="15" font-weight="800" fill="#fff">${p._n}</text>`}).join('');
   return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="100%" preserveAspectRatio="xMidYMid slice"><rect width="${w}" height="${h}" fill="${bg}"/>${g}${lines}${cl}${pins}<g transform="translate(${w-34} 40)"><circle r="20" fill="${dark?'#0b1240':'#fff'}" stroke="${dark?'#2c3478':'#dfe4ee'}"/><path d="M0 -13 L7 7 L0 3 L-7 7 Z" fill="#ef3b6e"/></g>${w>=400&&h>=300?`<text x="${w-14}" y="${h-12}" text-anchor="end" font-family="${FONT}" font-size="10.5" font-weight="600" fill="${dark?'#7a82c0':'#8a93a8'}">Trazos de corredores © OpenStreetMap</text>`:''}</svg>`;
 }
 function donut(parts,{size=200,stroke=34,center='',sub=''}={}){
@@ -81,13 +85,14 @@ function build(data,opts){
   const prio={Alta:0,Media:0,Baja:0};for(const p of sites)prio[priority(+p.score||0)[0]]++;
   const S=[];
 
-  // 1 · Portada
-  S.push({cls:'rs-cover',inner:`<svg class="rs-cover-deco" width="1280" height="720" viewBox="0 0 1280 720"><circle cx="560" cy="-60" r="260" fill="#ffffff" opacity=".04"/><circle cx="80" cy="700" r="200" fill="#ef3b6e" opacity=".10"/><circle cx="640" cy="640" r="120" fill="#21c4d9" opacity=".08"/></svg>
-   <div class="rs-cover-l"><div class="rs-cover-k">VEO TERRITORIOS · EXPANSIÓN DOOH</div><h1>Reporte ejecutivo<br/>de sitios</h1><p>Pantallas LED y espectaculares · Pipeline de adquisición</p>
-   <div class="rs-cover-kpis"><div><b>${sites.length}</b><span>${sites.length===1?'Sitio':'Sitios'}</span></div><div><b>${avg}</b><span>Score promedio</span></div><div><b>${Object.keys(byCorr).length}</b><span>Corredores</span></div></div>
-   <div class="rs-cover-ph">${phaseItems.map(x=>`<span style="border-color:${x.c}"><i style="background:${x.c}"></i>${PH_SHORT[x.i]}</span>`).join('')}</div>
-   <div class="rs-cover-date">${esc(date)}${user?` &nbsp;·&nbsp; Preparó: ${esc(user)}`:''}${opts.corridor?` &nbsp;·&nbsp; ${esc(corrName(opts.corridor))}`:''}</div></div>
-   <div class="rs-cover-map">${mapSvg(sites,{w:520,h:560,labels:false,dark:true})}</div>`});
+  // 1 · Portada (blanca, moderna)
+  const maxPh=Math.max(1,...phaseItems.map(x=>x.n));
+  S.push({cls:'rs-cover',inner:`<div class="rc-band"></div>
+   <div class="rc-l"><div class="rc-k"><span></span>VEO TERRITORIOS · EXPANSIÓN DOOH</div><h1>Reporte<br/>ejecutivo <em>de sitios</em></h1><p>Pantallas LED y espectaculares · Pipeline de adquisición</p>
+    <div class="rc-kpis"><div><b>${sites.length}</b><span>${sites.length===1?'Sitio':'Sitios'}</span></div><div><b>${avg}<i>/100</i></b><span>Score promedio</span></div><div><b>${Object.keys(byCorr).length}</b><span>Corredores</span></div></div>
+    <div class="rc-meta"><b>${esc(date)}</b>${user?`<span>Preparó: ${esc(user)}</span>`:''}${opts.corridor?`<span>${esc(corrName(opts.corridor))}</span>`:''}</div></div>
+   <div class="rc-r"><svg class="rc-art" width="560" height="600" viewBox="0 0 560 600"><defs><linearGradient id="rcg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#21c4d9"/><stop offset=".5" stop-color="#6a3df0"/><stop offset="1" stop-color="#ef3b6e"/></linearGradient></defs><rect x="40" y="0" width="520" height="600" rx="40" fill="url(#rcg)"/><circle cx="470" cy="90" r="160" fill="#fff" opacity=".10"/><circle cx="470" cy="90" r="100" fill="#fff" opacity=".10"/><circle cx="120" cy="560" r="130" fill="#fff" opacity=".08"/></svg>
+    <div class="rc-card"><div class="rc-card-h">Pipeline del reporte</div>${phaseItems.map(x=>`<div class="rc-ph"><span><i style="background:${x.c}"></i>${PH_NAME[x.i]}</span><div><em style="width:${(100*x.n/maxPh).toFixed(0)}%;background:${x.c}"></em></div><b>${x.n}</b></div>`).join('')}<div class="rc-card-f"><b>${sites.length}</b> sitios · ${phaseItems.length} fases</div></div></div>`});
 
   // 2 · Panorama
   const corrRows=Object.entries(byCorr).sort((a,b)=>b[1]-a[1]).slice(0,6),maxC=Math.max(1,...corrRows.map(x=>x[1]));
@@ -97,8 +102,12 @@ function build(data,opts){
    <div class="rs-row2"><div class="rs-card rs-donut"><h3>Prioridad del portafolio</h3><div class="rs-donut-in">${donut([{n:prio.Alta,c:'#1fa971'},{n:prio.Media,c:'#ec8a1f'},{n:prio.Baja,c:'#e33a6f'}],{size:180,stroke:30,center:sites.length,sub:'sitios'})}<ul>${[['Alta','#1fa971','Score ≥ 80'],['Media','#ec8a1f','Score 60 – 79'],['Baja','#e33a6f','Score < 60']].map(([k,c,t])=>`<li><i style="background:${c}"></i><b>${prio[k]}</b> Prioridad ${k}<small>${t}</small></li>`).join('')}</ul></div></div>
    <div class="rs-card"><h3>Sitios por corredor</h3>${corrRows.map(([id,n])=>`<div class="rs-hbar"><span>${esc(corrName(id))}</span><div><i style="width:${(100*n/maxC).toFixed(0)}%"></i></div><b>${n}</b></div>`).join('')||'<p class="rs-muted">Sin sitios</p>'}</div></div>`});
 
-  // 3 · Mapa
-  S.push({kicker:'02 · UBICACIÓN',title:'Mapa general de sitios',inner:`<div class="rs-mapgrid"><div class="rs-mapcard">${mapSvg(sites,{w:820,h:476})}</div><div class="rs-maplist">${sites.slice(0,11).map(p=>`<div><span class="rs-num" style="background:${PH_COLOR[pIdx(p)]}">${p._n}</span><b>${esc(p.alias)}</b><small>${esc(corrName(p.corridor_id))}</small></div>`).join('')}${sites.length>11?`<p class="rs-muted">+ ${sites.length-11} sitios más en el índice</p>`:''}<div class="rs-maplegend">${phaseItems.map(x=>`<span><i style="background:${x.c}"></i>${PH_SHORT[x.i]}</span>`).join('')}</div></div></div>`});
+  // 3 · Mapas por corredor (cada uno con su propio encuadre; 4 por diapositiva)
+  const groups=Object.entries(byCorr).sort((a,b)=>b[1]-a[1]).map(([id])=>({id,ps:sites.filter(p=>String(p.corridor_id)===String(id))}));
+  for(let g=0;g<Math.max(1,groups.length);g+=4){
+    const chunk=groups.slice(g,g+4),pages=Math.ceil(groups.length/4);
+    S.push({kicker:'02 · UBICACIÓN POR CORREDOR'+(pages>1?` · ${g/4+1} DE ${pages}`:''),title:'Mapas de sitios por corredor',inner:`<div class="rs-cmaps n${chunk.length}">${chunk.map(({id,ps})=>`<div class="rs-cmap"><div class="rs-cmap-h"><b>${esc(corrName(id))}</b><span>${ps.length} ${ps.length===1?'sitio':'sitios'}</span></div><div class="rs-cmap-b"><div class="rs-cmap-map">${mapSvg(ps,{w:chunk.length===1?760:chunk.length===2?560:330,h:chunk.length===1?400:chunk.length===2?300:190,labels:false,minSpan:.018})}</div><div class="rs-cmap-list">${ps.slice(0,chunk.length<=2?9:4).map(p=>`<div><span class="rs-num" style="background:${PH_COLOR[pIdx(p)]}">${p._n}</span><b>${esc(p.alias)}</b><small>${PH_SHORT[pIdx(p)]} · ${p.score??'—'} pts</small></div>`).join('')}${ps.length>(chunk.length<=2?9:4)?`<p class="rs-muted">+ ${ps.length-(chunk.length<=2?9:4)} más</p>`:''}</div></div></div>`).join('')||'<p class="rs-muted">Sin sitios georreferenciados</p>'}</div><div class="rs-maplegend2">${phaseItems.map(x=>`<span><i style="background:${x.c}"></i>${PH_NAME[x.i]}</span>`).join('')}</div>`});
+  }
 
   // 4 · Índice maestro (9 por diapositiva)
   for(let i=0;i<Math.max(1,sites.length);i+=9){

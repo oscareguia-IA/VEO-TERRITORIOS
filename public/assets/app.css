@@ -1245,3 +1245,55 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
 .rs-ready-phases small{font-size:12px;color:#8a90aa}
 .rs-cover-l{bottom:0}
 .rs-cover-l .rs-cover-date{left:0}
+/* Reporte · portada blanca */
+.rs-cover{background:#ffffff!important;color:#141a4a}
+.rs-cover .rs-accent{top:auto;bottom:0;height:10px}
+.rs-cover .rs-logo{background:none;padding:0;box-shadow:none;height:58px;top:56px;left:72px;right:auto}
+.rc-band{position:absolute;left:72px;top:136px;width:64px;height:6px;border-radius:3px;background:linear-gradient(90deg,#21c4d9,#6a3df0,#ef3b6e)}
+.rc-l{position:absolute;left:72px;top:170px;width:560px;bottom:40px}
+.rc-k{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:800;letter-spacing:2.6px;color:#6a3df0}
+.rc-k span{width:10px;height:10px;border-radius:50%;background:#ef3b6e}
+.rc-l h1{margin:18px 0 16px;font:800 76px/.98 'Space Grotesk','DM Sans',Arial,sans-serif;letter-spacing:-2.5px;color:#141a4a}
+.rc-l h1 em{font-style:normal;background:linear-gradient(90deg,#6a3df0,#ef3b6e);-webkit-background-clip:text;background-clip:text;color:transparent}
+.rc-l p{margin:0;font-size:19px;color:#5a6085;font-weight:500}
+.rc-kpis{display:flex;gap:0;margin-top:40px;border-top:1.5px solid #e6e9f2;border-bottom:1.5px solid #e6e9f2}
+.rc-kpis div{flex:1;padding:16px 0 14px;border-left:1.5px solid #e6e9f2;padding-left:22px}
+.rc-kpis div:first-child{border-left:0;padding-left:0}
+.rc-kpis b{display:block;font:800 42px/1 'Space Grotesk',Arial,sans-serif;color:#141a4a}
+.rc-kpis b i{font-style:normal;font-size:17px;color:#a3a8c0}
+.rc-kpis span{font-size:13px;font-weight:700;color:#7a809c}
+.rc-meta{position:absolute;left:0;bottom:46px;display:flex;gap:18px;align-items:center;font-size:14px;color:#7a809c;font-weight:600}
+.rc-meta b{color:#141a4a}
+.rc-r{position:absolute;right:52px;top:60px;width:560px;height:600px}
+.rc-art{position:absolute;inset:0}
+.rc-card{position:absolute;left:0;top:150px;width:430px;background:#fff;border-radius:22px;padding:24px 26px;box-shadow:0 30px 70px rgba(20,26,74,.22)}
+.rc-card-h{font-size:12.5px;font-weight:800;letter-spacing:1.8px;color:#7a809c;text-transform:uppercase;margin-bottom:10px}
+.rc-ph{display:grid;grid-template-columns:170px 1fr 30px;align-items:center;gap:10px;margin:13px 0;font-size:14px;font-weight:700;color:#2a2f5c}
+.rc-ph span{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.rc-ph span i{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none}
+.rc-ph>div{height:12px;border-radius:6px;background:#eef1f7;overflow:hidden}.rc-ph em{display:block;height:100%;border-radius:6px}
+.rc-ph b{text-align:right;font:800 20px 'Space Grotesk',Arial,sans-serif;color:#141a4a}
+.rc-card-f{margin-top:14px;padding-top:12px;border-top:1.5px solid #eef1f7;font-size:14px;color:#7a809c;font-weight:700}
+.rc-card-f b{color:#141a4a;font-size:18px}
+/* Reporte · mapas por corredor */
+.rs-cmaps{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.rs-cmaps.n1{grid-template-columns:1fr}
+.rs-cmap{background:#fff;border-radius:18px;border:1px solid #e8ebf3;box-shadow:0 6px 22px rgba(20,26,74,.07);overflow:hidden}
+.rs-cmap-h{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #eef1f7}
+.rs-cmap-h b{font-size:15px;color:#141a4a}.rs-cmap-h span{font-size:12px;font-weight:800;color:#ef3b6e;letter-spacing:.5px}
+.rs-cmap-b{display:flex}
+.rs-cmap-map{width:330px;height:205px;flex:none}
+.rs-cmaps.n1 .rs-cmap-map,.rs-cmaps.n2 .rs-cmap-map{width:560px;height:400px}
+.rs-cmaps.n1 .rs-cmap-map{width:760px}
+.rs-cmap-list{flex:1;min-width:0;padding:8px 14px;overflow:hidden}
+.rs-cmap-list>div{display:grid;grid-template-columns:28px 1fr;column-gap:9px;align-items:center;padding:5px 0;border-bottom:1px solid #f0f2f7}
+.rs-cmap-list b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rs-cmap-list small{grid-column:2;font-size:11px;color:#8a90aa}
+.rs-cmaps.n2 .rs-cmap-b{flex-direction:column}.rs-cmaps.n2 .rs-cmap-map{width:100%;height:300px}
+.rs-maplegend2{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:center;gap:20px;font-size:12.5px;font-weight:700;color:#4a5078}
+.rs-maplegend2 i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+.rc-ph{grid-template-columns:190px 1fr 30px}.rc-card{width:470px;left:-30px}
+.rs-cmap-map{height:190px}
+.rs-cmaps.n2 .rs-cmap-map{height:300px}
+.rs-cmaps.n1 .rs-cmap-map{width:760px;height:400px}
+.rs-maplegend2{bottom:-4px}
