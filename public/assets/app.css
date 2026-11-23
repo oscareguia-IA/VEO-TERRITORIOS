@@ -1304,3 +1304,25 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
 .rs-tmap-attr{position:absolute;right:6px;bottom:4px;font-size:9.5px;color:#5a6085;background:rgba(255,255,255,.75);padding:1px 5px;border-radius:4px}
 .rs-cmap-map,.rs-minimap{overflow:hidden}
 .rs-minimap .rs-tmap-tag{font-size:10.5px}
+
+/* Credenciales: recuadros compactos coloreados por rol */
+.role-legend{display:flex;flex-wrap:wrap;gap:7px;padding:4px 18px 12px}
+.role-chip{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:850;letter-spacing:.4px;padding:4px 10px;border-radius:999px;border:1px solid var(--rc);color:var(--rc);background:color-mix(in srgb,var(--rc) 12%,transparent)}
+.role-chip i{width:8px;height:8px;border-radius:50%;background:var(--rc)}.role-chip b{color:#f3f8ff}
+.user-tile,.role-chip{--rc:#8fb1c6}
+.role-dg{--rc:#f5b83d}.role-admin{--rc:#ff5c9a}.role-supervisor{--rc:#5aa6ff}.role-legal{--rc:#b48cff}.role-tecnico{--rc:#2fd3c5}.role-broker{--rc:#46d98c}
+.user-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;padding:0 18px 18px}
+.user-tile{display:flex;flex-direction:column;gap:8px;padding:11px 13px 11px 15px;border-radius:13px;border:1.5px solid color-mix(in srgb,var(--rc) 55%,transparent);border-left:5px solid var(--rc);background:linear-gradient(135deg,color-mix(in srgb,var(--rc) 16%,#132739),#132739 70%);min-width:0}
+.user-tile.is-off{opacity:.62;filter:saturate(.6)}
+.ut-head{display:flex;align-items:center;gap:10px;min-width:0}
+.ut-avatar{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:900;color:#0b1626;background:var(--rc)}
+.ut-id{display:flex;flex-direction:column;min-width:0;flex:1;line-height:1.25}
+.ut-id strong{font-size:13.5px;color:#f3f8ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ut-id span{font-size:11px;color:#a9c4d5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ut-role{flex:none;font-size:10px;font-weight:900;letter-spacing:.5px;padding:4px 8px;border-radius:7px;color:#0b1626;background:var(--rc)}
+.ut-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.ut-meta .account-state{padding:3px 7px;font-size:9.5px}
+.ut-date{font-size:11px;color:#bcd3e3}
+.ut-actions{display:flex;flex-wrap:wrap;gap:6px}
+.ut-actions .btn{min-height:32px;padding:6px 10px;font-size:10.5px;flex:1 1 auto}
+@media (max-width:720px){.user-tiles{grid-template-columns:1fr;gap:8px;padding:0 12px 14px}.role-legend{padding:4px 12px 10px}.ut-actions .btn{min-height:40px}}
