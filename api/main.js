@@ -204,6 +204,19 @@ async function handle(req,res){
   const csv=[cols.join(','),...ps.map(p=>cols.map(k=>{const value=k==='broker_name'?names[p.broker_id]||'':p[k]??'';let t=String(value);if(/^[=+\-@\t\r]/.test(t))t="'"+t;return '"'+t.replaceAll('"','""')+'"'}).join(','))].join('\r\n');
   res.statusCode=200;res.setHeader('Content-Type','text/csv; charset=utf-8');res.setHeader('Content-Disposition','attachment; filename="veo-territorios-predios.csv"');res.end('\uFEFF'+csv);return null;
  }
+ // Reporte ejecutivo (presentación para dirección): sólo administración, supervisión y legal.
+ // Sin datos de contacto del propietario; incluye fotos, calificación, avance y último comentario.
+ if(key==='report'&&method==='GET'){
+  ensure(['admin','supervisor','legal'].includes(me.role),'Sólo administración, supervisión y legal generan el reporte ejecutivo.',403);
+  const docCols='id,predio_id,doc_type,storage_path,original_filename,created_at,taken_at';
+  const [ps,users,documents,comments]=await Promise.all([list('veo_predios',{active:'eq.true',order:'updated_at.desc',limit:3000}),list('veo_users'),list('veo_documents',{select:docCols,limit:10000}),list('veo_comments',{order:'created_at.desc',limit:3000})]);
+  const names=Object.fromEntries(users.map(x=>[x.id,x.display_name]));const byP={};for(const d of documents)(byP[d.predio_id]=byP[d.predio_id]||[]).push(d);
+  const lastC={};for(const c of comments)if(!lastC[c.predio_id])lastC[c.predio_id]={body:cleanText(c.body,280),author:c.author,at:c.created_at};
+  const order={foto:0,satelital:1,operacion:2,dron:3};
+  return {generated_at:new Date().toISOString(),weights:WEIGHTS,predios:ps.map(p=>{const docs=byP[p.id]||[];const imgs=docs.filter(d=>mediaKind(d)==='img').sort((a,b)=>(order[a.doc_type]??9)-(order[b.doc_type]??9)||b.id-a.id).slice(0,4).map(d=>({id:d.id,type:d.doc_type,name:d.original_filename}));
+   return {id:p.id,code:p.code,alias:p.alias,corridor_id:p.corridor_id,municipio:p.municipio,direccion:p.direccion,referencia:p.referencia,lat:p.lat,lng:p.lng,phase:p.phase,score:p.score,ratings_json:p.ratings_json,permiso_status:p.permiso_status,clausula_condicional:p.clausula_condicional,broker_name:names[p.broker_id]||'Sin asignar',created_at:p.created_at,updated_at:p.updated_at,docs_count:docs.length,images:imgs,
+    next_requirements:p.phase===LAST_PHASE?[]:reqItems(p,docs,PHASES[PHASES.indexOf(p.phase)+1]),readiness:readiness(p,docs),last_comment:lastC[p.id]||null}})};
+ }
  if(key==='archives'&&method==='GET'){ensure(mayManage(me),'Sólo supervisión puede consultar archivos.',403);const [ps,users]=await Promise.all([list('veo_predios',{active:'eq.false',limit:2000}),list('veo_users')]);const names=Object.fromEntries(users.map(x=>[x.id,x.display_name]));return {predios:ps.map(p=>({...p,broker_name:names[p.broker_id]||'—'}))}}
  if(key==='geo/validate'&&method==='POST')return validateGeo(+b.corridor_id,{lat:b.lat,lng:b.lng});
  if(key==='predios'&&method==='POST'){

@@ -166,6 +166,21 @@ test('predio EN OPERACIÓN es de sólo lectura salvo desbloqueo con credenciales
   assert.ok(db.veo_activity.some(x => x.kind === 'desbloqueo' && /autorizó/.test(x.detail)), 'queda en la bitácora');
 });
 
+test('reporte ejecutivo: sólo admin, supervisor y legal; sin datos de contacto', async () => {
+  await addUser('ana', 'admin'); await addUser('lucia', 'legal'); const beto = await addUser('beto', 'broker');
+  db.veo_predios.push({ id: 1, code: 'VEO-01-00001', alias: 'Sitio', broker_id: beto.id, created_by: beto.id, active: true, phase: 'SEGUIMIENTO', corridor_id: 1, telefono: '8110000000', email: 'x@y.com', propietario: 'Dueño' });
+  db.veo_documents.push({ id: 1, predio_id: 1, doc_type: 'foto', storage_path: '1/a.jpg', original_filename: 'foto_predio_1.jpg' });
+  assert.equal((await call('GET', 'report', { cookie: (await loginAs('beto')).cookie })).status, 403);
+  for (const u of ['ana', 'lucia']) {
+    const r = await call('GET', 'report', { cookie: (await loginAs(u)).cookie });
+    assert.equal(r.status, 200, JSON.stringify(r.data));
+    const p = r.data.predios[0];
+    assert.equal(p.code, 'VEO-01-00001'); assert.equal(p.broker_name, 'BETO'); assert.equal(p.images.length, 1);
+    assert.ok(Array.isArray(p.next_requirements));
+    assert.equal(p.telefono, undefined); assert.equal(p.email, undefined); assert.equal(p.propietario, undefined);
+  }
+});
+
 test('bootstrap nunca expone password_hash', async () => {
   await addUser('ana', 'admin'); await addUser('beto', 'broker');
   const { boot } = await loginAs('ana');
