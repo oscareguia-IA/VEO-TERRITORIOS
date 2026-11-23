@@ -20,6 +20,7 @@ let before = 0, after = 0;
 for await (const file of walk(OUT)) {
   const ext = extname(file);
   if (ext !== '.js' && ext !== '.css') continue;
+  if (file.includes('/vendor/')) continue; // librerías de terceros: ya minificadas, se conserva su aviso de licencia
   const code = await readFile(file, 'utf8');
   if (!code.trim()) continue;
   const out = await transform(code, { loader: ext.slice(1), minify: true, sourcemap: false, target: ext === '.js' ? 'es2020' : 'chrome90', legalComments: 'none' });
