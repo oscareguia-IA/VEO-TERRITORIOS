@@ -1200,3 +1200,10 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
 .rep-rank-row .rep-chip{text-align:center}
 .rep-photo img{object-fit:cover}
 .rep-photos[style*="repeat(1,"] .rep-photo img{object-fit:contain;background:#0f1b2c}
+
+/* Computadora (Mac/PC): el expediente se abre centrado como ventana grande, no pegado a un costado */
+@media (min-width:1001px){
+ .drawer-root:not(:empty){justify-content:center;align-items:center;padding:3vh 3vw}
+ .drawer-box{width:min(1180px,94vw);height:min(94vh,1080px);max-height:94vh;border:1px solid #40516a;border-radius:20px;padding:26px 34px 40px;box-shadow:0 40px 120px #000c;animation:drawer-pop .2s cubic-bezier(.2,1,.2,1)}
+}
+@keyframes drawer-pop{from{opacity:.4;transform:scale(.97)}to{opacity:1;transform:none}}
