@@ -1338,3 +1338,14 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
  .sidebar-edge:hover+.sidebar,.sidebar:hover,.sidebar:has(:focus-visible){transform:none;box-shadow:24px 0 80px #000a;transition:transform .26s cubic-bezier(.2,.9,.2,1) .04s,box-shadow .26s ease}
  .workspace{width:100%}
 }
+
+/* Selector de archivo de Documentos */
+.file-drop{position:relative;display:flex;align-items:center;gap:14px;min-height:74px;padding:14px 18px;border:2px dashed #3f6a8a;border-radius:14px;background:#0f2235;cursor:pointer;transition:border-color .15s,background .15s}
+.file-drop:hover,.file-drop.is-over,.file-drop:focus-within{border-color:#6ee8ef;background:#123047}
+.file-drop.has-file{border-style:solid;border-color:#46d98c;background:#10302c}
+.file-drop-input{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.file-drop-ico{flex:none;width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:21px;background:#1d3a55}
+.file-drop.has-file .file-drop-ico{background:#1b4a3c}
+.file-drop-text{display:flex;flex-direction:column;gap:3px;min-width:0}
+.file-drop-text b{font-size:14px;color:#eaf6ff;overflow-wrap:anywhere}
+.file-drop-text small{font-size:11.5px;color:#a9c4d5}
