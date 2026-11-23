@@ -430,6 +430,16 @@ test('rol DG tiene los mismos privilegios que admin', async () => {
   assert.equal((await call('DELETE', 'predios/1', { ...d, body: { confirmation_code: 'VEO-01-00001' }, extra: { 'x-veo-unlock': (await call('POST', 'predios/1/unlock', { ...d, body: { username: 'dir', password: 'clave-segura-123' } })).data.token } })).status, 200, 'puede eliminar predios');
 });
 
+test('contraseña temporal puede ser sólo números (mínimo 4)', async () => {
+  await addUser('ana', 'admin');
+  const a = await loginAs('ana');
+  assert.equal((await call('POST', 'users', { ...a, body: { username: 'corto', password: '123' } })).status, 400);
+  const r = await call('POST', 'users', { ...a, body: { username: 'pin', password: '4821' } });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  const p = await loginAs('pin', '4821');
+  assert.equal(p.boot.data.must_change_password, true, 'debe cambiarla al ingresar');
+});
+
 test('CSV neutraliza fórmulas de Excel', async () => {
   await addUser('ana', 'admin');
   db.veo_predios.push({ id: 1, code: 'VEO-01-00001', alias: '=HYPERLINK("http://x")', propietario: '+52 81', active: true });
