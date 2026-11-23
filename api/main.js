@@ -30,7 +30,7 @@ const env=()=>{
 };
 // Las claves sb_secret_* no son JWT; pasan sólo por el encabezado apikey.
 const apiHeaders=()=>{const {key}=env();const headers={'apikey':key,'Accept':'application/json'};if(!key.startsWith('sb_secret_'))headers['Authorization']=`Bearer ${key}`;return headers;};
-function qs(obj){const u=new URLSearchParams();for(const [k,v] of Object.entries(obj||{}))if(v!==null&&v!==undefined)u.set(k,String(v));return u.toString()}
+function qs(obj){const u=new URLSearchParams();for(const [k,v] of Object.entries(obj||{}))if(v!==null&&v!==undefined)u.set(k,String(v));return u.toString().replace(/\+/g,'%20')}
 async function rest(table,{query={},method='GET',data,returning=true}={}){
  const {url}=env(),suffix=qs(query),endpoint=`${url}/rest/v1/${table}${suffix?'?'+suffix:''}`;
  const h={...apiHeaders()};if(method!=='GET'){h['Content-Type']='application/json';h['Prefer']=returning?'return=representation':'return=minimal';}
@@ -61,7 +61,9 @@ const canSee=(u,p)=>u.role!=='broker'||+p.broker_id===+u.id;
 const canEdit=canSee;
 async function predioFor(me,id){const p=await one('veo_predios',{id:`eq.${id}`});ensure(p&&canSee(me,p),'No existe el predio o no tienes permiso.',404);return p}
 const cleanText=(v,max=2000)=>String(v??'').trim().slice(0,max);
-const validUsername=(str)=>/^[a-zA-Z0-9._-]{3,50}$/.test(str);
+// Usuario: letras (con acentos/ñ), números y espacios; también se aceptan . _ - pero no son necesarios.
+const normUser=v=>cleanText(v,50).normalize('NFC').replace(/\s+/g,' ').toLowerCase();
+const validUsername=(str)=>/^[\p{L}\p{N}](?:[\p{L}\p{N} ._-]{1,48})[\p{L}\p{N}]$/u.test(str);
 const reqItems=(p,docs,to)=>{const found=t=>docs.some(x=>x.doc_type===t),items=[];const push=(label,done)=>items.push({key:label,label,done:!!done});
  if(to==='PRIMER_CONTACTO'){push('Broker asignado',p.broker_id);push('Ubicación registrada (pin GPS)',p.lat!=null&&p.lng!=null);push('Fotografía del predio',found('foto'));push('Evidencia de mapa satelital',found('satelital'));push('Calificación ≥70/100',p.score>=70)}
  if(to==='SEGUIMIENTO'){push('Nombre del dueño / administrador',p.propietario);push('Teléfono o correo de contacto',p.telefono||p.email);push('Fecha del primer contacto',p.fecha_contacto);push('Respuesta no descartada',['evaluando','interesado'].includes(p.interes));push('Recibo de pago del predial',found('predial'))}
@@ -115,7 +117,7 @@ function docGeo(b){
  return{geo_lat:+lat.toFixed(7),geo_lng:+lng.toFixed(7),geo_source:b.geo_source,geo_accuracy_m:acc,taken_at:taken};
 }
 async function login(body,res,req){
- const username=cleanText(body.username,50).toLowerCase();ensure(username&&body.password,'Introduce usuario y contraseña.');
+ const username=normUser(body.username);ensure(username&&body.password,'Introduce usuario y contraseña.');
  const ip=clientIp(req),userKey='u:'+username,ipKey='ip:'+ip;
  const wait=Number(await rpc('veo_login_check',{p_keys:[userKey,ipKey]}))||0;
  if(wait>0)throw tooMany(res,wait);
@@ -187,7 +189,7 @@ async function handle(req,res){
  ensure(!me.must_change_password,'Debes cambiar la contraseña temporal antes de continuar.',403);
  if(key==='users'&&method==='POST'){
   ensure(isAdm(me),'Sólo el administrador gestiona credenciales.',403);
-  const username=cleanText(b.username,50).toLowerCase(),password=String(b.password||''),role=b.role||'broker';ensure(validUsername(username),'El usuario debe tener 3-50 caracteres (letras, números, punto, guion o _).');ensure(password.length>=4&&password.length<=128,'La contraseña temporal debe tener entre 4 y 128 caracteres (pueden ser sólo números).');ensure(ROLES.has(role),'Rol no válido.');
+  const username=normUser(b.username),password=String(b.password||''),role=b.role||'broker';ensure(validUsername(username),'El usuario debe tener 3-50 caracteres: letras, números y espacios (ej. Juan Pérez).');ensure(password.length>=4&&password.length<=128,'La contraseña temporal debe tener entre 4 y 128 caracteres (pueden ser sólo números).');ensure(ROLES.has(role),'Rol no válido.');
   const user=await add('veo_users',{username,display_name:cleanText(b.display_name,120)||username,role,active:true,must_change_password:true,password_hash:await hashPassword(password)});await audit(me,null,'credenciales',`Creó cuenta ${user.username}`);return {ok:true,id:user.id};
  }
  if(parts[0]==='users'&&parts[1]&&['PATCH','DELETE'].includes(method)){
@@ -238,7 +240,7 @@ async function handle(req,res){
   if(parts[2]==='unlock'&&method==='POST'){
    ensure(isLocked(p),'Este predio no está bloqueado.');ensure(canEdit(me,p)||mayManage(me),'No tienes acceso a este predio.',403);
    const k=`desbloqueo:${me.id}`;const wait=Number(await rpc('veo_login_check',{p_keys:[k]}))||0;if(wait>0)throw tooMany(res,wait);
-   const username=cleanText(b.username,50).toLowerCase();const admin=username?await one('veo_users',{username:`eq.${username}`}):null;
+   const username=normUser(b.username);const admin=username?await one('veo_users',{username:`eq.${username}`}):null;
    const ok=admin&&admin.active&&isAdm(admin)?await checkPassword(String(b.password||''),admin.password_hash):(await checkPassword(String(b.password||''),DUMMY_HASH),false);
    if(!ok){const lock=Number(await rpc('veo_login_fail',{p_key:k,p_max:LOGIN_USER_MAX,p_window_s:LOGIN_WINDOW_S,p_lock_s:LOGIN_LOCK_S}))||0;await audit(me,pid,'desbloqueo','Intento fallido de desbloquear el predio en operación');if(lock>0)throw tooMany(res,lock);throw codeError(401,'Credenciales de administrador incorrectas.')}
    await rpc('veo_login_reset',{p_key:k});

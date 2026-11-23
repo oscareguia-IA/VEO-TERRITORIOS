@@ -441,6 +441,17 @@ test('contraseña temporal puede ser sólo números (mínimo 4)', async () => {
   assert.equal(p.boot.data.must_change_password, true, 'debe cambiarla al ingresar');
 });
 
+test('usuario puede ser un nombre con espacios y acentos', async () => {
+  await addUser('ana', 'admin');
+  const a = await loginAs('ana');
+  const r = await call('POST', 'users', { ...a, body: { username: '  Juan   Pérez ', password: '1234' } });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.ok(db.veo_users.some(u => u.username === 'juan pérez'));
+  const l = await call('POST', 'login', { body: { username: 'JUAN PÉREZ', password: '1234' } });
+  assert.equal(l.status, 200, 'entra sin importar mayúsculas ni espacios extra');
+  assert.equal((await call('POST', 'users', { ...a, body: { username: 'a<b>c', password: '1234' } })).status, 400);
+});
+
 test('CSV neutraliza fórmulas de Excel', async () => {
   await addUser('ana', 'admin');
   db.veo_predios.push({ id: 1, code: 'VEO-01-00001', alias: '=HYPERLINK("http://x")', propietario: '+52 81', active: true });
