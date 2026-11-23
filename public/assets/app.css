@@ -1061,3 +1061,10 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
 .dash-total-operacion{background:linear-gradient(120deg,#175343,#12362f 70%);border-color:#2f9c78;box-shadow:inset 5px 0 #3ddc97}
 .dash-total-operacion small,.dash-total-operacion b{color:#3ddc97}
 @media (max-width:720px){.dash-totals{grid-template-columns:1fr;gap:10px}.dash-total{padding:14px 40px 14px 16px}.dash-total b{font-size:44px}}
+
+/* Expedientes agrupados por etapa */
+.predio-group-head{grid-column:1/-1;display:flex;align-items:center;gap:9px;margin:10px 2px 0;font-size:12px;font-weight:850;letter-spacing:1px;text-transform:uppercase}
+.predio-group-head:first-child{margin-top:0}
+.predio-group-head span{font-family:'Space Grotesk',sans-serif;font-size:13px;padding:2px 7px;border-radius:7px;background:#ffffff14}
+.predio-group-head b{margin-left:auto;font-size:12px;padding:2px 9px;border-radius:999px;background:#ffffff12}
+.phase-head-1{color:#2ed3df}.phase-head-2{color:#c3a4ff}.phase-head-3{color:#ffc06d}.phase-head-4{color:#ff6b9b}.phase-head-5{color:#3ddc97}
