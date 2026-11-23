@@ -42,12 +42,37 @@ function mapSvg(sites,{w=1000,h=560,labels=true,dark=false,minSpan=0.06}={}){
   for(const [id,ls] of Object.entries(trazos||{})){const on=used.has(+id);for(const l of ls){if(l.length<2)continue;lines+=`<path d="M${l.map(q=>X(q[1]).toFixed(1)+' '+Y(q[0]).toFixed(1)).join('L')}" fill="none" stroke="${on?hot:cold}" stroke-width="${on?6:3}" stroke-linecap="round" stroke-linejoin="round" opacity="${on?1:.8}"/>`}}
   let cl='';const taken=pts.map(p=>[X(+p.lng),Y(+p.lat)]);if(labels)for(const id of used){const ls=(trazos||{})[id];if(!ls)continue;let best=null;const free=(x,y)=>taken.every(([a,b])=>Math.abs(a-x)>150||Math.abs(b-y)>34);for(const l of ls){for(const q of l){const x=X(q[1]),y=Y(q[0]);if(x>60&&x<w-200&&y>40&&y<h-40&&free(x,y)){best=[x,y];break}}if(best)break}if(best)taken.push(best);
     if(best)cl+=`<text x="${(best[0]+10).toFixed(0)}" y="${(best[1]-10).toFixed(0)}" font-family="${FONT}" font-size="12" font-weight="800" letter-spacing="1" fill="${dark?'#ff9ab7':'#c2185b'}" stroke="${bg}" stroke-width="4" paint-order="stroke">${esc(corrName(id).toUpperCase())}</text>`}
+  const pins=pinsSvg(pts,X,Y,w,h);
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="100%" preserveAspectRatio="xMidYMid slice"><rect width="${w}" height="${h}" fill="${bg}"/>${g}${lines}${cl}${pins}<g transform="translate(${w-34} 40)"><circle r="20" fill="${dark?'#0b1240':'#fff'}" stroke="${dark?'#2c3478':'#dfe4ee'}"/><path d="M0 -13 L7 7 L0 3 L-7 7 Z" fill="#ef3b6e"/></g>${w>=400&&h>=300?`<text x="${w-14}" y="${h-12}" text-anchor="end" font-family="${FONT}" font-size="10.5" font-weight="600" fill="${dark?'#7a82c0':'#8a93a8'}">Trazos de corredores © OpenStreetMap</text>`:''}</svg>`;
+}
+function pinsSvg(pts,X,Y,w,h){
   // Separar pines que se enciman: se desplazan en espiral y se dibuja una línea guía al punto real.
   const R=17,pos=pts.map(p=>({p,x0:X(+p.lng),y0:Y(+p.lat)}));pos.forEach(a=>{a.x=a.x0;a.y=a.y0});
   for(let it=0;it<60;it++){let moved=false;for(let a=0;a<pos.length;a++)for(let b=a+1;b<pos.length;b++){const A=pos[a],B=pos[b];let dx=B.x-A.x,dy=B.y-A.y,d=Math.hypot(dx,dy);const min=2*R+8;if(d<min){if(d<.01){dx=Math.cos(b*2.4);dy=Math.sin(b*2.4);d=1}const k=(min-d)/2/d;A.x-=dx*k;A.y-=dy*k;B.x+=dx*k;B.y+=dy*k;moved=true}}if(!moved)break}
   for(const a of pos){a.x=Math.max(R+4,Math.min(w-R-4,a.x));a.y=Math.max(R+4,Math.min(h-R-4,a.y))}
-  const pins=pos.map(({p,x0,y0,x,y})=>{const c=PH_COLOR[pIdx(p)],off=Math.hypot(x-x0,y-y0)>4;return `${off?`<line x1="${x0.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${c}" stroke-width="2"/><circle cx="${x0.toFixed(1)}" cy="${y0.toFixed(1)}" r="4" fill="${c}"/>`:`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="26" fill="${c}" opacity=".18"/>`}<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${R-1}" fill="${c}" stroke="#fff" stroke-width="3.5"/><text x="${x.toFixed(1)}" y="${(y+5.5).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="15" font-weight="800" fill="#fff">${p._n}</text>`}).join('');
-  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="100%" preserveAspectRatio="xMidYMid slice"><rect width="${w}" height="${h}" fill="${bg}"/>${g}${lines}${cl}${pins}<g transform="translate(${w-34} 40)"><circle r="20" fill="${dark?'#0b1240':'#fff'}" stroke="${dark?'#2c3478':'#dfe4ee'}"/><path d="M0 -13 L7 7 L0 3 L-7 7 Z" fill="#ef3b6e"/></g>${w>=400&&h>=300?`<text x="${w-14}" y="${h-12}" text-anchor="end" font-family="${FONT}" font-size="10.5" font-weight="600" fill="${dark?'#7a82c0':'#8a93a8'}">Trazos de corredores © OpenStreetMap</text>`:''}</svg>`;
+  return pos.map(({p,x0,y0,x,y})=>{const c=PH_COLOR[pIdx(p)],off=Math.hypot(x-x0,y-y0)>4;return `${off?`<line x1="${x0.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${c}" stroke-width="2"/><circle cx="${x0.toFixed(1)}" cy="${y0.toFixed(1)}" r="4" fill="${c}"/>`:`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="26" fill="${c}" opacity=".18"/>`}<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${R-1}" fill="${c}" stroke="#fff" stroke-width="3.5"/><text x="${x.toFixed(1)}" y="${(y+5.5).toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="15" font-weight="800" fill="#fff">${p._n}</text>`}).join('');
+}
+// Mapa con calles (Esri World Street Map, mismo proveedor que el mapa de respaldo de la app): encuadre del tramo del corredor alrededor de los sitios.
+function tileMap(sites,{w=560,h=300,corridorId=null,label=''}={}){
+  const pts=sites.filter(p=>Number.isFinite(+p.lat)&&Number.isFinite(+p.lng));
+  if(!pts.length)return mapSvg([],{w,h});
+  const cid=corridorId??pts[0].corridor_id,lines=(trazos||{})[cid]||[];
+  const near=(la,lo,km)=>pts.some(p=>Math.abs(p.lat-la)*111<km&&Math.abs(p.lng-lo)*100<km);
+  let la=pts.map(p=>+p.lat),lo=pts.map(p=>+p.lng);
+  for(const l of lines)for(const q of l)if(near(q[0],q[1],2.2)){la.push(q[0]);lo.push(q[1])}
+  let s=Math.min(...la),n=Math.max(...la),we=Math.min(...lo),e=Math.max(...lo);
+  const cy=(s+n)/2,cx=(we+e)/2,minLat=.022,minLng=.026;
+  if(n-s<minLat){s=cy-minLat/2;n=cy+minLat/2}if(e-we<minLng){we=cx-minLng/2;e=cx+minLng/2}
+  const wx=(lng,z)=>256*2**z*(lng+180)/360,wy=(lat,z)=>{const r=lat*Math.PI/180;return 256*2**z*(1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2};
+  let z=16;while(z>10&&((wx(e,z)-wx(we,z))*1.22>w||(wy(s,z)-wy(n,z))*1.22>h))z--;
+  const px=wx(cx,z),py=wy((s+n)/2,z),x0=px-w/2,y0=py-h/2;
+  let tiles='';const sub='abcd';
+  for(let tx=Math.floor(x0/256);tx<=Math.floor((x0+w)/256);tx++)for(let ty=Math.floor(y0/256);ty<=Math.floor((y0+h)/256);ty++)
+    tiles+=`<img src="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${z}/${ty}/${tx}" crossorigin="anonymous" alt="" style="position:absolute;left:${(tx*256-x0).toFixed(1)}px;top:${(ty*256-y0).toFixed(1)}px;width:256px;height:256px;max-width:none"/>`;
+  const X=lng=>wx(lng,z)-x0,Y=lat=>wy(lat,z)-y0;
+  let path='';for(const l of lines){if(l.length<2)continue;path+=`<path d="M${l.map(q=>X(q[1]).toFixed(1)+' '+Y(q[0]).toFixed(1)).join('L')}" fill="none" stroke="#ef3b6e" stroke-width="6" stroke-opacity=".55" stroke-linecap="round" stroke-linejoin="round"/>`}
+  const tag=label||corrName(cid);
+  return `<div class="rs-tmap" style="width:${w}px;height:${h}px">${tiles}<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="position:absolute;left:0;top:0">${path}${pinsSvg(pts,X,Y,w,h)}<g transform="translate(${w-30} 30)"><circle r="17" fill="#fff" stroke="#dfe4ee"/><path d="M0 -11 L6 6 L0 3 L-6 6 Z" fill="#ef3b6e"/></g></svg><span class="rs-tmap-tag"><i></i>${esc(tag)}</span><span class="rs-tmap-attr">Esri · HERE · OpenStreetMap</span></div>`;
 }
 function donut(parts,{size=200,stroke=34,center='',sub=''}={}){
   const total=parts.reduce((n,x)=>n+x.n,0)||1,r=(size-stroke)/2,C=2*Math.PI*r;let off=0,arcs='';
@@ -106,7 +131,7 @@ function build(data,opts){
   const groups=Object.entries(byCorr).sort((a,b)=>b[1]-a[1]).map(([id])=>({id,ps:sites.filter(p=>String(p.corridor_id)===String(id))}));
   for(let g=0;g<Math.max(1,groups.length);g+=4){
     const chunk=groups.slice(g,g+4),pages=Math.ceil(groups.length/4);
-    S.push({kicker:'02 · UBICACIÓN POR CORREDOR'+(pages>1?` · ${g/4+1} DE ${pages}`:''),title:'Mapas de sitios por corredor',inner:`<div class="rs-cmaps n${chunk.length}">${chunk.map(({id,ps})=>`<div class="rs-cmap"><div class="rs-cmap-h"><b>${esc(corrName(id))}</b><span>${ps.length} ${ps.length===1?'sitio':'sitios'}</span></div><div class="rs-cmap-b"><div class="rs-cmap-map">${mapSvg(ps,{w:chunk.length===1?760:chunk.length===2?560:330,h:chunk.length===1?400:chunk.length===2?300:190,labels:false,minSpan:.018})}</div><div class="rs-cmap-list">${ps.slice(0,chunk.length<=2?9:4).map(p=>`<div><span class="rs-num" style="background:${PH_COLOR[pIdx(p)]}">${p._n}</span><b>${esc(p.alias)}</b><small>${PH_SHORT[pIdx(p)]} · ${p.score??'—'} pts</small></div>`).join('')}${ps.length>(chunk.length<=2?9:4)?`<p class="rs-muted">+ ${ps.length-(chunk.length<=2?9:4)} más</p>`:''}</div></div></div>`).join('')||'<p class="rs-muted">Sin sitios georreferenciados</p>'}</div><div class="rs-maplegend2">${phaseItems.map(x=>`<span><i style="background:${x.c}"></i>${PH_NAME[x.i]}</span>`).join('')}</div>`});
+    S.push({kicker:'02 · UBICACIÓN POR CORREDOR'+(pages>1?` · ${g/4+1} DE ${pages}`:''),title:'Mapas de sitios por corredor',inner:`<div class="rs-cmaps n${chunk.length}">${chunk.map(({id,ps})=>`<div class="rs-cmap"><div class="rs-cmap-h"><b>${esc(corrName(id))}</b><span>${ps.length} ${ps.length===1?'sitio':'sitios'}</span></div><div class="rs-cmap-b"><div class="rs-cmap-map">${tileMap(ps,{w:chunk.length===1?760:chunk.length===2?560:330,h:chunk.length===1?400:chunk.length===2?300:190,corridorId:+id})}</div><div class="rs-cmap-list">${ps.slice(0,chunk.length<=2?9:4).map(p=>`<div><span class="rs-num" style="background:${PH_COLOR[pIdx(p)]}">${p._n}</span><b>${esc(p.alias)}</b><small>${PH_SHORT[pIdx(p)]} · ${p.score??'—'} pts</small></div>`).join('')}${ps.length>(chunk.length<=2?9:4)?`<p class="rs-muted">+ ${ps.length-(chunk.length<=2?9:4)} más</p>`:''}</div></div></div>`).join('')||'<p class="rs-muted">Sin sitios georreferenciados</p>'}</div><div class="rs-maplegend2">${phaseItems.map(x=>`<span><i style="background:${x.c}"></i>${PH_NAME[x.i]}</span>`).join('')}</div>`});
   }
 
   // 4 · Índice maestro (9 por diapositiva)
@@ -121,7 +146,7 @@ function build(data,opts){
     let r={};try{r=JSON.parse(p.ratings_json||'{}')}catch(_){}
     const req=(p.phase==='EN_OPERACION'?p.readiness?.items:p.next_requirements)||[];
     const thumbs=imgs.slice(1,3);
-    const second=thumbs.length===2?thumbs.map(m=>photo(m,'rs-ph-sm')).join(''):`${thumbs.length?photo(thumbs[0],'rs-ph-sm'):''}<div class="rs-minimap">${mapSvg([p],{w:thumbs.length?280:580,h:150,labels:false,minSpan:.03})}<span>Ubicación</span></div>`;
+    const second=thumbs.length===2?thumbs.map(m=>photo(m,'rs-ph-sm')).join(''):`${thumbs.length?photo(thumbs[0],'rs-ph-sm'):''}<div class="rs-minimap">${tileMap([p],{w:thumbs.length?280:572,h:166})}</div>`;
     const fact=(k,v)=>`<div><small>${k}</small><b>${v}</b></div>`;
     S.push({kicker:`FICHA DE SITIO · #${p._n} · ${esc(p.code)}`,title:esc(p.alias),cls:'rs-ficha',inner:`<div class="rs-tags">${pill('Fase '+(pIdx(p)+1)+' · '+PH_NAME[pIdx(p)],c)}${pill(corrName(p.corridor_id),'#1b1a8c',false)}${pill('Prioridad '+pr,pc,false)}</div>
      <div class="rs-ficha-grid"><div class="rs-ficha-l">${imgs[0]?photo(imgs[0],'rs-ph-main'):`<div class="rs-ph rs-ph-main rs-ph-empty"><span>Sin fotografía cargada</span></div>`}<div class="rs-ficha-thumbs">${second}</div></div>

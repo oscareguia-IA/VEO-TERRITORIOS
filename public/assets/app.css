@@ -1169,7 +1169,7 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
 .rs-ficha-l{display:flex;flex-direction:column;gap:12px}
 .rs-ph{position:relative;border-radius:18px;overflow:hidden;background:#dfe4ee;box-shadow:0 8px 24px rgba(20,26,74,.12)}
 .rs-ph img{width:100%;height:100%;object-fit:cover;display:block}
-.rs-ph span,.rs-minimap span{position:absolute;left:12px;bottom:12px;background:rgba(11,18,64,.78);color:#fff;font-size:11.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:5px 10px;border-radius:8px}
+.rs-ph>span{position:absolute;left:12px;bottom:12px;background:rgba(11,18,64,.78);color:#fff;font-size:11.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:5px 10px;border-radius:8px}
 .rs-ph-main{height:340px}
 .rs-ph-empty{display:flex;align-items:center;justify-content:center}.rs-ph-empty span{position:static;background:none;color:#8a90aa;font-size:15px}
 .rs-ficha-thumbs{display:flex;gap:12px;height:166px}
@@ -1297,3 +1297,10 @@ button,select,[role="button"]{-webkit-tap-highlight-color:transparent}
 .rs-cmaps.n2 .rs-cmap-map{height:300px}
 .rs-cmaps.n1 .rs-cmap-map{width:760px;height:400px}
 .rs-maplegend2{bottom:-4px}
+/* Reporte · mapas con calles */
+.rs-tmap{position:relative;overflow:hidden;background:#eef0f3}
+.rs-tmap-tag{position:absolute;left:10px;top:10px;display:inline-flex;align-items:center;gap:6px;background:#fff;color:#141a4a;font-size:11.5px;font-weight:800;padding:5px 10px;border-radius:999px;box-shadow:0 3px 10px rgba(20,26,74,.18);text-transform:uppercase;letter-spacing:.4px}
+.rs-tmap-tag i{width:14px;height:4px;border-radius:2px;background:#ef3b6e;display:inline-block}
+.rs-tmap-attr{position:absolute;right:6px;bottom:4px;font-size:9.5px;color:#5a6085;background:rgba(255,255,255,.75);padding:1px 5px;border-radius:4px}
+.rs-cmap-map,.rs-minimap{overflow:hidden}
+.rs-minimap .rs-tmap-tag{font-size:10.5px}
