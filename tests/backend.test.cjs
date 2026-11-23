@@ -415,6 +415,21 @@ test('sólo admin crea usuarios; broker no exporta CSV', async () => {
   assert.equal((await call('POST', 'users', { ...a, body: { username: 'nuevo', password: 'clave-segura-123' } })).status, 200);
 });
 
+test('rol DG tiene los mismos privilegios que admin', async () => {
+  await addUser('dir', 'dg'); const beto = await addUser('beto', 'broker');
+  db.veo_predios.push({ id: 1, code: 'VEO-01-00001', alias: 'Operando', broker_id: beto.id, created_by: beto.id, active: true, phase: 'EN_OPERACION', corridor_id: 1 });
+  const d = await loginAs('dir');
+  assert.ok(d.boot.data.users.length >= 2, 've a todo el equipo');
+  const nuevo = await call('POST', 'users', { ...d, body: { username: 'nuevo', password: 'clave-segura-123', role: 'dg' } });
+  assert.equal(nuevo.status, 200, 'gestiona credenciales y crea otro DG');
+  assert.equal((await call('GET', 'export.csv', { cookie: d.cookie })).status, 200);
+  assert.equal((await call('GET', 'report', { cookie: d.cookie })).status, 200);
+  const b = await loginAs('beto');
+  const ok = await call('POST', 'predios/1/unlock', { cookie: b.cookie, csrf: b.csrf, body: { username: 'dir', password: 'clave-segura-123' } });
+  assert.equal(ok.status, 200, 'sus credenciales desbloquean predios en operación');
+  assert.equal((await call('DELETE', 'predios/1', { ...d, body: { confirmation_code: 'VEO-01-00001' }, extra: { 'x-veo-unlock': (await call('POST', 'predios/1/unlock', { ...d, body: { username: 'dir', password: 'clave-segura-123' } })).data.token } })).status, 200, 'puede eliminar predios');
+});
+
 test('CSV neutraliza fórmulas de Excel', async () => {
   await addUser('ana', 'admin');
   db.veo_predios.push({ id: 1, code: 'VEO-01-00001', alias: '=HYPERLINK("http://x")', propietario: '+52 81', active: true });

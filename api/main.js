@@ -16,7 +16,9 @@ const PHASE_LABEL={BUSQUEDA_FACTIBILIDAD:'Búsqueda / Factibilidad',PRIMER_CONTA
 const WEIGHTS={flujo:45,visibilidad:25,electrica:10,propietario:10,comercial:10};
 const CORRIDOR_MAX=15; // 15 = Av. Manuel L. Barragán (agregado nov. 2026)
 const DOC_TYPES=new Set(['foto','satelital','dron','carta_intencion','predial','contrato','mecanica_suelos','memoria_calculo','factibilidad_electrica','permiso_municipal','programa_obra','operacion','otro']);
-const ROLES=new Set(['admin','supervisor','broker','legal','tecnico']);
+const ROLES=new Set(['admin','dg','supervisor','broker','legal','tecnico']);
+// DG (Dirección General) tiene exactamente los mismos privilegios que el administrador.
+const ADMIN_ROLES=['admin','dg'];const isAdm=u=>ADMIN_ROLES.includes(u?.role);
 const COOKIE='veo_sesion', SECONDS=7*24*60*60, IDLE_MS=15*60*1000, MAX_FILE=45*1024*1024;
 const codeError=(status,detail)=>Object.assign(new Error(detail),{status});
 const ensure=(ok,msg,status=400)=>{if(!ok)throw codeError(status,msg)};
@@ -53,7 +55,7 @@ const setSession=(res,user,iat)=>{const token=signedSession(user,iat);res.setHea
 const clearSession=res=>res.setHeader('Set-Cookie',`${COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`);
 function send(res,status,obj){res.statusCode=status;res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify(obj))}
 const audit=(me,predio_id,kind,detail)=>add('veo_activity',{predio_id:predio_id||null,user_id:me.id,user_name:me.display_name,kind,detail});
-const mayManage=u=>['admin','supervisor'].includes(u.role);
+const mayManage=u=>['admin','dg','supervisor'].includes(u.role);
 // Un broker sólo accede a los predios que tiene asignados hoy: al reasignar, el anterior pierde el acceso.
 const canSee=(u,p)=>u.role!=='broker'||+p.broker_id===+u.id;
 const canEdit=canSee;
@@ -184,15 +186,15 @@ async function handle(req,res){
  }
  ensure(!me.must_change_password,'Debes cambiar la contraseña temporal antes de continuar.',403);
  if(key==='users'&&method==='POST'){
-  ensure(me.role==='admin','Sólo el administrador gestiona credenciales.',403);
+  ensure(isAdm(me),'Sólo el administrador gestiona credenciales.',403);
   const username=cleanText(b.username,50).toLowerCase(),password=String(b.password||''),role=b.role||'broker';ensure(validUsername(username),'El usuario debe tener 3-50 caracteres (letras, números, punto, guion o _).');ensure(password.length>=7&&password.length<=128,'La contraseña temporal debe tener entre 7 y 128 caracteres.');ensure(ROLES.has(role),'Rol no válido.');
   const user=await add('veo_users',{username,display_name:cleanText(b.display_name,120)||username,role,active:true,must_change_password:true,password_hash:await hashPassword(password)});await audit(me,null,'credenciales',`Creó cuenta ${user.username}`);return {ok:true,id:user.id};
  }
  if(parts[0]==='users'&&parts[1]&&['PATCH','DELETE'].includes(method)){
-  ensure(me.role==='admin','Sólo el administrador gestiona credenciales.',403);const target=await one('veo_users',{id:`eq.${+parts[1]}`});ensure(target,'Usuario inexistente.',404);
+  ensure(isAdm(me),'Sólo el administrador gestiona credenciales.',403);const target=await one('veo_users',{id:`eq.${+parts[1]}`});ensure(target,'Usuario inexistente.',404);
   if(method==='DELETE'){ensure(target.role==='broker','La baja sólo se aplica a brokers.');ensure(target.id!==me.id,'No puedes darte de baja.');await patch('veo_users',target.id,{active:false,session_version:target.session_version+1});await audit(me,null,'credenciales',`Baja de broker ${target.username}`);const assoc=await list('veo_predios',{select:'id',broker_id:`eq.${target.id}`});return{ok:true,predios_preservados:assoc.length}}
   ensure(ROLES.has(b.role??target.role),'Rol no válido.');const update={display_name:cleanText(b.display_name??target.display_name,120),role:b.role??target.role,active:b.active!==undefined?!!b.active:target.active};
-  if(target.id===me.id)ensure(update.active&&update.role==='admin'&&!b.password,'Utiliza Mi contraseña; no puedes retirar tu propio acceso.');
+  if(target.id===me.id)ensure(update.active&&ADMIN_ROLES.includes(update.role)&&!b.password,'Utiliza Mi contraseña; no puedes retirar tu propio acceso.');
   if(b.password){ensure(String(b.password).length>=7&&String(b.password).length<=128,'Contraseña temporal entre 7 y 128 caracteres.');update.password_hash=await hashPassword(b.password);update.must_change_password=true;update.credential_updated_at=new Date().toISOString()}
   update.session_version=target.session_version+1;await patch('veo_users',target.id,update);await audit(me,null,'credenciales',`Actualizó cuenta ${target.username}`);
   if(target.id===me.id){const refreshed=await one('veo_users',{id:`eq.${me.id}`});setSession(res,refreshed)}return{ok:true};
@@ -207,7 +209,7 @@ async function handle(req,res){
  // Reporte ejecutivo (presentación para dirección): sólo administración, supervisión y legal.
  // Sin datos de contacto del propietario; incluye fotos, calificación, avance y último comentario.
  if(key==='report'&&method==='GET'){
-  ensure(['admin','supervisor','legal'].includes(me.role),'Sólo administración, supervisión y legal generan el reporte ejecutivo.',403);
+  ensure(['admin','dg','supervisor','legal'].includes(me.role),'Sólo administración, supervisión y legal generan el reporte ejecutivo.',403);
   const docCols='id,predio_id,doc_type,storage_path,original_filename,created_at,taken_at';
   const [ps,users,documents,comments]=await Promise.all([list('veo_predios',{active:'eq.true',order:'updated_at.desc',limit:3000}),list('veo_users'),list('veo_documents',{select:docCols,limit:10000}),list('veo_comments',{order:'created_at.desc',limit:3000})]);
   const names=Object.fromEntries(users.map(x=>[x.id,x.display_name]));const byP={};for(const d of documents)(byP[d.predio_id]=byP[d.predio_id]||[]).push(d);
@@ -237,7 +239,7 @@ async function handle(req,res){
    ensure(isLocked(p),'Este predio no está bloqueado.');ensure(canEdit(me,p)||mayManage(me),'No tienes acceso a este predio.',403);
    const k=`desbloqueo:${me.id}`;const wait=Number(await rpc('veo_login_check',{p_keys:[k]}))||0;if(wait>0)throw tooMany(res,wait);
    const username=cleanText(b.username,50).toLowerCase();const admin=username?await one('veo_users',{username:`eq.${username}`}):null;
-   const ok=admin&&admin.active&&admin.role==='admin'?await checkPassword(String(b.password||''),admin.password_hash):(await checkPassword(String(b.password||''),DUMMY_HASH),false);
+   const ok=admin&&admin.active&&isAdm(admin)?await checkPassword(String(b.password||''),admin.password_hash):(await checkPassword(String(b.password||''),DUMMY_HASH),false);
    if(!ok){const lock=Number(await rpc('veo_login_fail',{p_key:k,p_max:LOGIN_USER_MAX,p_window_s:LOGIN_WINDOW_S,p_lock_s:LOGIN_LOCK_S}))||0;await audit(me,pid,'desbloqueo','Intento fallido de desbloquear el predio en operación');if(lock>0)throw tooMany(res,lock);throw codeError(401,'Credenciales de administrador incorrectas.')}
    await rpc('veo_login_reset',{p_key:k});
    await audit(me,pid,'desbloqueo',`Desbloqueó la edición del predio en operación (autorizó ${admin.display_name||admin.username}, 15 min)`);
@@ -246,7 +248,7 @@ async function handle(req,res){
   if(parts.length===2&&method==='PATCH'){
    ensure(canEdit(me,p),'No puedes editar este predio.',403);ensureUnlocked(req,me,p);const allowed=['alias','municipio','direccion','referencia','dron_url','propietario','telefono','email','fecha_contacto','interes','fecha_carta','clausula_condicional','notas','ratings_json'];
    if(mayManage(me))allowed.push('broker_id','lat','lng','corridor_id');
-   if(['admin','supervisor','legal'].includes(me.role))allowed.push('permiso_status');
+   if(['admin','dg','supervisor','legal'].includes(me.role))allowed.push('permiso_status');
    const up={};for(const f of allowed)if(Object.hasOwn(b,f))up[f]=b[f];
    for(const f of ['alias','municipio','direccion','referencia','dron_url','propietario','telefono','email','interes','notas'])if(f in up)up[f]=cleanText(up[f],f==='notas'?5000:500);
    for(const f of ['fecha_contacto','fecha_carta'])if(up[f]==='')up[f]=null;
@@ -256,7 +258,7 @@ async function handle(req,res){
    up.updated_at=new Date().toISOString();await patch('veo_predios',pid,up);await audit(me,pid,'edicion','Actualizó expediente');return{ok:true};
   }
   if(parts.length===2&&method==='DELETE'){
-   ensure(me.role==='admin','Sólo ADMIN puede eliminar predios definitivamente.',403);ensureUnlocked(req,me,p);ensure(b.confirmation_code===p.code,'Escribe el ID exacto del predio.');
+   ensure(isAdm(me),'Sólo ADMIN puede eliminar predios definitivamente.',403);ensureUnlocked(req,me,p);ensure(b.confirmation_code===p.code,'Escribe el ID exacto del predio.');
    const docs=await list('veo_documents',{predio_id:`eq.${pid}`});await remove('veo_predios',pid);
    let pending=0;for(const d of docs)try{await storage('DELETE',`object/veo-documentos/${encodedPath(d.storage_path)}`)}catch(_){pending++}
    await audit(me,null,'eliminacion_permanente',`Eliminó definitivamente el expediente ${p.code}`);return{ok:true,deleted_code:p.code,files_cleanup_pending:pending};
